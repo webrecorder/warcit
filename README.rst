@@ -1,6 +1,9 @@
-# WARCIT
+WARCIT
+======
 
-Usage: ``python warcit/warcit.py <prefix> <dir or file> ...``
+Basic Usage: ``warcit <prefix> <dir or file> ...``
+
+See ``warcit -h`` for latest options
 
 The following example will get files via ``wget``, then use warcit to convert to ``www.iana.org.warc.gz``::
 
