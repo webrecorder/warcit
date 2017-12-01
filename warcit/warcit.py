@@ -233,6 +233,6 @@ def get_version():
 
 
 # ============================================================================
-if __name__ == "__main__":
+if __name__ == "__main__":   #pragma: no cover
     res = main()
     sys.exit(res)
