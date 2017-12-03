@@ -5,6 +5,7 @@ import sys
 import datetime
 import mimetypes
 import logging
+import zipfile
 
 from warcio.warcwriter import WARCWriter
 from warcio.timeutils import datetime_to_iso_date, timestamp_to_iso_date
@@ -28,6 +29,8 @@ def main(args=None):
 
     parser.add_argument('-a', '--append', action='store_true')
     parser.add_argument('-o', '--overwrite', action='store_true')
+
+    parser.add_argument('--prefix')
 
     parser.add_argument('--no-magic', action='store_true')
     parser.add_argument('--no-gzip', action='store_true')
@@ -63,6 +66,7 @@ def main(args=None):
                   loglevel=loglevel,
                   mode=mode,
                   index_files=r.index_files,
+                  prefix=r.prefix,
                  ).run()
 
 
@@ -75,13 +79,14 @@ class WARCIT(object):
                  magic=True,
                  loglevel=None,
                  mode='xb',
-                 index_files=None):
+                 index_files=None,
+                 prefix=None):
 
         self.logger = logging.getLogger('WARCIT')
         if loglevel:
             self.logger.setLevel(loglevel)
 
-        self.url_prefix = url_prefix.rstrip('/') + '/'
+        self.url_prefix = url_prefix
         self.inputs = inputs
         self.gzip = gzip
         self.count = 0
@@ -149,19 +154,20 @@ class WARCIT(object):
         with closing(output):
             writer = WARCWriter(output, gzip=self.gzip)
 
-            for url, filename in self.iter_inputs():
-                self.make_record(writer, url, filename)
+            for file_info in self.iter_inputs():
+                self.make_record(writer, file_info)
 
         self.logger.info('Wrote {0} resources to {1}'.format(self.count, self.name))
         return 0
 
-    def make_record(self, writer, url, filename):
-        stats = os.stat(filename)
-
+    def make_record(self, writer, file_info):
         if self.fixed_dt:
             warc_date = self.fixed_dt
         else:
-            warc_date = datetime_to_iso_date(datetime.datetime.utcfromtimestamp(stats.st_mtime))
+            warc_date = datetime_to_iso_date(file_info.modified_dt)
+
+        filename = file_info.filename
+        url = file_info.url
 
         source_uri = 'file://' + filename
 
@@ -170,12 +176,12 @@ class WARCIT(object):
                         'WARC-Created-Date': writer._make_warc_date()
                        }
 
-        warc_content_type = self._guess_type(url, filename)
+        warc_content_type = self._guess_type(file_info)
 
-        with open(filename, 'rb') as fh:
+        with file_info.open() as fh:
             record = writer.create_warc_record(url, 'resource',
                                       payload=fh,
-                                      length=stats.st_size,
+                                      length=file_info.size,
                                       warc_content_type=warc_content_type,
                                       warc_headers_dict=warc_headers)
 
@@ -200,30 +206,95 @@ class WARCIT(object):
         self.count += 1
         writer.write_record(revisit_record)
 
-    def _guess_type(self, url, filename):
+    def _guess_type(self, file_info):
         mime = None
         if self.magic:
-            mime = self.magic.from_file(filename)
+            with file_info.open() as fh:
+                mime = self.magic.from_buffer(fh.read(2048))
         else:
-            mime = mimetypes.guess_type(url.split('?', 1)[0], False)
+            mime = mimetypes.guess_type(file_info.url.split('?', 1)[0], False)
             mime = mime[0] or 'text/html'
 
         return mime
 
-    def join_url(self, path):
-        return self.url_prefix + path.strip('./')
-
     def iter_inputs(self):
         for input_ in self.inputs:
-            if os.path.isfile(input_):
-                yield self.join_url(os.path.basename(input_)), input_
-
-            elif os.path.isdir(input_):
+            if os.path.isdir(input_):
                 for root, dirs, files in os.walk(input_):
                     for name in files:
                         filename = os.path.join(root, name)
                         path = os.path.relpath(filename, input_)
-                        yield self.join_url(path), filename
+                        yield FileInfo(self.url_prefix, path, filename)
+
+            else:
+                is_zip, filename, zip_prefix = self.parse_filename(input_)
+
+                if not is_zip:
+                    if filename and not zip_prefix:
+                        yield FileInfo(self.url_prefix, os.path.basename(input_), input_)
+                    else:
+                        self.logger.error('"{0}" not a valid file or directory'.format(input_))
+
+                else:
+                    with zipfile.ZipFile(filename) as zp:
+                        for zinfo in zp.infolist():
+                            if zinfo.filename.endswith('/'):
+                                continue
+
+                            if zip_prefix and not zinfo.filename.startswith(zip_prefix):
+                                continue
+
+                            yield ZipFileInfo(self.url_prefix, zp, zinfo, zip_prefix)
+    def parse_filename(self, filename):
+        zip_path = []
+        while filename:
+            if os.path.isfile(filename):
+                if zipfile.is_zipfile(filename):
+                    return True, filename, '/'.join(zip_path)
+                else:
+                    return False, filename, ''
+
+            elif os.path.isdir(filename):
+                return False, '', ''
+
+            else:
+                zip_path.insert(0, os.path.basename(filename))
+                filename = os.path.dirname(filename)
+
+        return False, '', ''
+
+
+# ============================================================================
+class FileInfo(object):
+    def __init__(self, url_prefix, path, filename):
+        self.url = url_prefix + path.strip('./')
+        self.filename = filename
+
+        stats = os.stat(filename)
+        self.modified_dt = datetime.datetime.utcfromtimestamp(stats.st_mtime)
+        self.size = stats.st_size
+
+    def open(self):
+        return open(self.filename, 'rb')
+
+
+# ============================================================================
+class ZipFileInfo(object):
+    def __init__(self, url_prefix, zp, zinfo, prefix=None):
+        filename = zinfo.filename
+        if prefix and filename.startswith(prefix):
+            filename = filename[len(prefix):]
+
+        self.url = url_prefix + filename.strip('./')
+        self.filename = zinfo.filename
+        self.zp = zp
+
+        self.modified_dt = datetime.datetime(*zinfo.date_time)
+        self.size = zinfo.file_size
+
+    def open(self):
+        return self.zp.open(self.filename, 'r')
+
 
 
 # ============================================================================
