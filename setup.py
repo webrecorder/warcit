@@ -34,6 +34,7 @@ setup(
         ],
     install_requires=[
         'warcio',
+        'chardet'
         ],
     zip_safe=True,
     entry_points="""
