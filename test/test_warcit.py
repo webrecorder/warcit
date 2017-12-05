@@ -3,6 +3,7 @@ import tempfile
 import os
 import sys
 import zipfile
+import pytest
 
 from io import BytesIO
 from warcit.warcit import main
@@ -74,7 +75,7 @@ class TestWarcIt(object):
         assert '"warc-type": "revisit", "warc-target-uri": "http://www.iana.org/"' not in out
 
     def test_warcit_fixed_date(self, capsys):
-        res = main(['-q', '-n', 'test', '--no-magic', '-d', '2010-12-26T10:11:12', 'http://www.iana.org/', self.test_dir])
+        res = main(['-q', '-n', 'test', '-d', '2010-12-26T10:11:12', 'http://www.iana.org/', self.test_dir])
         assert res == 0
 
         warcio_main(['index', '-f', 'warc-target-uri,warc-date,content-type', 'test.warc.gz'])
@@ -112,7 +113,7 @@ class TestWarcIt(object):
         assert res == 0
 
         assert 'Wrote 24 resources to www.iana.org.zip.warc.gz' in caplog.text
-        assert 'Writing http://www.iana.org/index.html at 2017-10-17T14:30:26Z from www.iana.org/index.html' in caplog.text
+        assert 'Writing "http://www.iana.org/index.html" (text/html) @ "2017-10-17T14:30:26Z" from "www.iana.org/index.html"' in caplog.text
         assert os.path.isfile(os.path.join(self.root_dir, 'www.iana.org.zip.warc.gz'))
 
     def test_warcit_new_zip_file_path(self, caplog):
@@ -120,7 +121,7 @@ class TestWarcIt(object):
         assert res == 0
 
         assert 'Wrote 24 resources to www.iana.org.warc.gz' in caplog.text
-        assert 'Writing http://www.iana.org/index.html at 2017-10-17T14:30:26Z from www.iana.org/index.html' in caplog.text
+        assert 'Writing "http://www.iana.org/index.html" (text/html) @ "2017-10-17T14:30:26Z" from "www.iana.org/index.html"' in caplog.text
         assert os.path.isfile(os.path.join(self.root_dir, 'www.iana.org.warc.gz'))
 
     def test_warcit_no_such_zip_prefix(self, caplog):
@@ -142,3 +143,17 @@ class TestWarcIt(object):
 
         assert 'www.iana.org.zip_nosuch" not a valid' in caplog.text
 
+    def test_with_magic(self, caplog):
+        pytest.importorskip('magic')
+        res = main(['-q', '-o', '--use-magic', '-n', 'test', 'http://www.iana.org/', self.test_dir])
+        assert res == 0
+
+    def test_no_magic(self, caplog):
+        import sys
+        sys.modules['magic'] = None
+
+        res = main(['-q', '--use-magic', '-n', 'test', 'http://www.iana.org/', self.test_dir])
+        assert res == 1
+        assert "python-magic or libmagic is not available" in caplog.text
+
+        del sys.modules['magic']

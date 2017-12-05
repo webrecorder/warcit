@@ -24,12 +24,24 @@ The WARC ``www.iana.org.warc.gz`` should now have been created!
 Mime Type Detection and Overrides
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``warcit`` uses the ``python-magic`` (libmagic) if it is installed for detecting the mime-type. To disable, ``python-magic``, use ``--no-magic``
-Otherwise, ``warcit`` guesses the mime type based on the file extension.
+By default, ``warcit`` supports the the default Python ``mimetypes`` library to determine a mime type based on a file extension.
 
-However, specific overrides for mime-type can be set explicitly, via the ``--mime-overrides`` flag as a comma-delimeted property list::
+However, it also supports using `python-magic <https://pypi.python.org/pypi/python-magic>`_ (libmagic) if available and custom mime overrides configured via the command line.
 
-  warcit '--mime-overrides=*.html=text/html; charset="utf-8",*.ico=image/png' http://www.iana.org/ ./www.iana.org/
+The mime detection is as follows:
+
+1) If the filename matches an override specified via ``--mime-overrides``, use that as the mime type.
+
+2) If ``mimetypes.guess_type()`` returns a valid mime type, use that as the mime type.
+
+3) If ``--use-magic`` flag is specified, use the ``magic`` api to determine mime type (``warcit`` will error if ``magic`` is not available when using this flag).
+
+4) Default to ``text/html`` if all previous attempts did not yield a mime type.
+
+
+The ``--mime-overrides`` flag can be used to specify wildcard query (applied to the full url) and corresponding mime types as a comma-delimeted property list::
+
+  warcit '--mime-overrides=*.html=text/html; charset="utf-8",image.ico=image/png' http://www.iana.org/ ./www.iana.org/
 
 When a url ending in ``*.html`` or ``*.ico`` is encountered, the specified mime type will be used for the ``Content-Type`` header, by passing any auto-detection.
 

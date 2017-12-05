@@ -32,7 +32,7 @@ def main(args=None):
     parser.add_argument('-a', '--append', action='store_true')
     parser.add_argument('-o', '--overwrite', action='store_true')
 
-    parser.add_argument('--no-magic', action='store_true')
+    parser.add_argument('--use-magic', action='store_true')
     parser.add_argument('--no-gzip', action='store_true')
     parser.add_argument('--no-warcinfo', action='store_true')
 
@@ -65,7 +65,7 @@ def main(args=None):
                   name=r.name,
                   fixed_dt=r.fixed_dt,
                   gzip=not r.no_gzip,
-                  magic=not r.no_magic,
+                  use_magic=r.use_magic,
                   warcinfo=not r.no_warcinfo,
                   loglevel=loglevel,
                   mode=mode,
@@ -81,7 +81,7 @@ class WARCIT(object):
                  name=None,
                  fixed_dt=None,
                  gzip=True,
-                 magic=True,
+                 use_magic=False,
                  warcinfo=True,
                  loglevel=None,
                  mode='xb',
@@ -118,7 +118,8 @@ class WARCIT(object):
                 p = mime.split('=', 1)
                 self.mime_overrides[p[0]] = p[1]
 
-        self.magic = magic and self.load_magic()
+        self.use_magic = use_magic
+        self.magic = None
 
     def _set_fixed_dt(self, fixed_dt):
         if not fixed_dt:
@@ -132,10 +133,12 @@ class WARCIT(object):
     def load_magic(self):
         try:
             import magic
-            return magic.Magic(mime=True)
-        except:
-            self.logger.warn('python-magic not available, guessing mime by extension only')
-            return None
+            self.magic = magic.Magic(mime=True)
+            return True
+        except Exception as e:
+            self.logger.error(e)
+            self.logger.error('python-magic or libmagic is not available, please install or run without --use-magic flag')
+            return False
 
     def _make_name(self, name):
         """ Set WARC file name use, defaults when needed
@@ -160,6 +163,10 @@ class WARCIT(object):
         return name
 
     def run(self):
+        if self.use_magic:
+            if not self.load_magic():
+                return 1
+
         try:
             output = open(self.name, self.mode)
         except FileExistsError as e:
@@ -218,7 +225,7 @@ class WARCIT(object):
 
             self.count += 1
             writer.write_record(record)
-            self.logger.debug('Writing {0} at {1} from {2}'.format(url, warc_date, filename))
+            self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(url, warc_content_type, warc_date, filename))
 
         if url.lower().endswith(self.index_files):
             self.add_index_revisit(writer, record, url, warc_date, source_uri)
@@ -238,18 +245,21 @@ class WARCIT(object):
         writer.write_record(revisit_record)
 
     def _guess_type(self, file_info):
-        mime = None
         if self.mime_overrides:
             for pattern in self.mime_overrides:
                 if fnmatch.fnmatch(file_info.url, pattern):
                     return self.mime_overrides[pattern]
 
+        mime = mimetypes.guess_type(file_info.url.split('?', 1)[0], False)
+        if mime[0]:
+            return mime[0]
+
+        mime = None
         if self.magic:
             with file_info.open() as fh:
                 mime = self.magic.from_buffer(fh.read(2048))
-        else:
-            mime = mimetypes.guess_type(file_info.url.split('?', 1)[0], False)
-            mime = mime[0] or 'text/html'
+
+        mime = mime or 'text/html'
 
         return mime
 
