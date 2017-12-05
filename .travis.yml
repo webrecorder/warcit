@@ -11,7 +11,7 @@ sudo: false
 
 install:
   - python setup.py install
-  - pip install coverage pytest-cov coveralls
+  - pip install -U pytest coverage pytest-cov coveralls
 
 script:
   - python setup.py test
