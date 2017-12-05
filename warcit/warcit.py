@@ -4,6 +4,7 @@ import os
 import sys
 import datetime
 import mimetypes
+import chardet
 import logging
 import zipfile
 import fnmatch
@@ -21,29 +22,49 @@ def main(args=None):
         print('Sorry, warcit requires python >= 3.4, you are running {0}'.format(sys.version.split(' ')[0]))
         return 1
 
-    parser = ArgumentParser(description='Convert Directories and Files to Web Archive (WARC)',
-                            formatter_class=RawTextHelpFormatter)
+    parser = ArgumentParser(description='Convert Directories and Files to Web Archive (WARC)')
 
     parser.add_argument('-V', '--version', action='version', version=get_version())
 
-    parser.add_argument('url_prefix')
-    parser.add_argument('inputs', nargs='+')
+    parser.add_argument('url_prefix',
+                        help='''The base URL for all items to be included, including
+                                protocol. Example: https://cool.website:8080/files/''')
+    parser.add_argument('inputs', nargs='+',
+                        help='''Paths of directories and/or files to be included in 
+                                the WARC file.''')
 
-    parser.add_argument('-d', '--fixed-dt')
+    parser.add_argument('-d', '--fixed-dt',
+                        help='''Set resource date and time in YYYYMMDDHHMMSS format.
+                                If not given, last modified date of files is used.''',
+                        metavar='timestamp')
 
-    parser.add_argument('-n', '--name')
+    parser.add_argument('-n', '--name',
+                        help='''base name for WARC file''',
+                        metavar='name')
 
     parser.add_argument('-a', '--append', action='store_true')
     parser.add_argument('-o', '--overwrite', action='store_true')
 
     parser.add_argument('--use-magic', action='store_true')
-    parser.add_argument('--no-gzip', action='store_true')
     parser.add_argument('--no-warcinfo', action='store_true')
+    parser.add_argument('--no-gzip', 
+                        help='''Do not compress WARC file.''',
+                        action='store_true')
+
+    parser.add_argument('-c', '--charset', default='none', 
+                        help='''Set charset for text/* MIME types. Use "auto" for 
+                                automatically guessing, "none" (default) for not adding 
+                                charset information.''',
+                        metavar='charset')
 
     parser.add_argument('-q', '--quiet', action='store_true')
     parser.add_argument('-v', '--verbose', action='store_true')
 
-    parser.add_argument('--index-files', default='index.html,index.htm')
+    parser.add_argument('--index-files', default='index.html,index.htm',
+                        help='''Comma separated list of filenames that should be treated as 
+                                index files: a revisit record with their base URL (up to the 
+                                next slash) will be created. Default is "index.html,index.htm".''',
+                        metavar='name1,name2,...')
 
     parser.add_argument('-m', '--mime-overrides')
 
@@ -56,7 +77,7 @@ def main(args=None):
     else:
         mode = 'xb'
 
-    logging.basicConfig(format='%(asctime)s: [%(levelname)s]: %(message)s')
+    logging.basicConfig(format='[%(levelname)s] %(message)s')
     if r.verbose:
         loglevel = logging.DEBUG
     elif r.quiet:
@@ -71,6 +92,7 @@ def main(args=None):
                   gzip=not r.no_gzip,
                   use_magic=r.use_magic,
                   warcinfo=not r.no_warcinfo,
+                  charset=r.charset,
                   loglevel=loglevel,
                   mode=mode,
                   index_files=r.index_files,
@@ -87,6 +109,7 @@ class WARCIT(object):
                  gzip=True,
                  use_magic=False,
                  warcinfo=True,
+                 charset='none',
                  loglevel=None,
                  mode='xb',
                  index_files=None,
@@ -125,6 +148,8 @@ class WARCIT(object):
         self.use_magic = use_magic
         self.magic = None
 
+        self.charset = charset
+
     def _set_fixed_dt(self, fixed_dt):
         if not fixed_dt:
             return None
@@ -145,7 +170,7 @@ class WARCIT(object):
             return False
 
     def _make_name(self, name):
-        """ Set WARC file name use, defaults when needed
+        """ Set WARC file name, use defaults when needed
         """
 
         # if no name, use basename of first input
@@ -221,6 +246,10 @@ class WARCIT(object):
         warc_content_type = self._guess_type(file_info)
 
         with file_info.open() as fh:
+
+            if warc_content_type.startswith('text/'):
+                warc_content_type += self._guess_charset(warc_content_type, filename)
+
             record = writer.create_warc_record(url, 'resource',
                                       payload=fh,
                                       length=file_info.size,
@@ -229,6 +258,7 @@ class WARCIT(object):
 
             self.count += 1
             writer.write_record(record)
+
             self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(url, warc_content_type, warc_date, filename))
 
         if url.lower().endswith(self.index_files):
@@ -266,6 +296,26 @@ class WARCIT(object):
         mime = mime or 'text/html'
 
         return mime
+
+    def _guess_charset(self, content_type, filename):
+        charset = None
+        if self.charset == 'none':
+            pass
+        elif self.charset == 'auto':
+            charset = chardet.detect(open(filename, 'rb').read())['encoding']
+            if charset == 'ascii':
+                charset = ''
+        else:
+            charset = self.charset
+
+        if charset:
+            return ';charset=' + charset
+        else:
+            return ''
+
+    def join_url(self, path):
+        return self.url_prefix + path.strip('./')
+
 
     def iter_inputs(self):
         for input_ in self.inputs:
