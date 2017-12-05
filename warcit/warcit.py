@@ -17,6 +17,10 @@ from collections import OrderedDict
 
 # ============================================================================
 def main(args=None):
+    if sys.version_info < (3, 4):  #pragma: no cover
+        print('Sorry, warcit requires python >= 3.4, you are running {0}'.format(sys.version.split(' ')[0]))
+        return 1
+
     parser = ArgumentParser(description='Convert Directories and Files to Web Archive (WARC)',
                             formatter_class=RawTextHelpFormatter)
 
