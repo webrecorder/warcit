@@ -80,7 +80,9 @@ class TestWarcIt(object):
         with patch_stream(sys.stdout) as buff:
             warcio_main(['index', '-f', 'warc-type,warc-target-uri,warc-date', 'test.warc'])
 
-        assert '"warc-type": "revisit", "warc-target-uri": "http://www.iana.org/"' in buff.getvalue().decode('utf-8')
+        buff = buff.getvalue().decode('utf-8')
+        assert '"warc-type": "warcinfo"' in buff
+        assert '"warc-type": "revisit", "warc-target-uri": "http://www.iana.org/"' in buff
 
     def test_warcit_no_revisit(self):
         with patch_stream() as buff:
@@ -90,7 +92,9 @@ class TestWarcIt(object):
         with patch_stream(sys.stdout) as buff:
             warcio_main(['index', '-f', 'warc-type,warc-target-uri,warc-date', 'test.warc'])
 
-        assert '"warc-type": "revisit", "warc-target-uri": "http://www.iana.org/"' not in buff.getvalue().decode('utf-8')
+        buff = buff.getvalue().decode('utf-8')
+        assert '"warc-type": "warcinfo"' in buff
+        assert '"warc-type": "revisit", "warc-target-uri": "http://www.iana.org/"' not in buff
 
     def test_warcit_fixed_date(self):
         with patch_stream() as buff:
@@ -98,23 +102,37 @@ class TestWarcIt(object):
             assert res == 0
 
         with patch_stream(sys.stdout) as buff:
-            warcio_main(['index', '-f', 'warc-target-uri,warc-date', 'test.warc.gz'])
+            warcio_main(['index', '-f', 'warc-target-uri,warc-date,content-type', 'test.warc.gz'])
 
-        assert '"warc-target-uri": "http://www.iana.org/index.html", "warc-date": "2010-12-26T10:11:12Z"' in buff.getvalue().decode('utf-8')
+        assert '"warc-target-uri": "http://www.iana.org/index.html", "warc-date": "2010-12-26T10:11:12Z", "content-type": "text/html"' in buff.getvalue().decode('utf-8')
 
-    def test_warcit_single_file(self):
+    def test_warcit_mime_override(self):
         with patch_stream() as buff:
-            res = main(['-v', 'http://www.iana.org/', os.path.join(self.test_dir, 'index.html')])
+            res = main(['-q', '-n', 'test2', '--mime-overrides=*/index.html=custom/mime', 'http://www.iana.org/', self.test_dir])
+            assert res == 0
+
+        with patch_stream(sys.stdout) as buff:
+            warcio_main(['index', '-f', 'warc-target-uri,content-type', 'test2.warc.gz'])
+
+        buff = buff.getvalue().decode('utf-8')
+        assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "custom/mime"' in buff
+        assert '"warc-target-uri": "http://www.iana.org/about/index.html", "content-type": "custom/mime"' in buff
+
+    def test_warcit_single_file_and_no_warcinfo(self):
+        with patch_stream() as buff:
+            res = main(['-v', '--no-warcinfo', 'http://www.iana.org/', os.path.join(self.test_dir, 'index.html')])
             assert res == 0
 
         assert 'Wrote 2 resources to index.html.warc.gz' in buff.getvalue().decode('utf-8')
         assert os.path.isfile(os.path.join(self.root_dir, 'index.html.warc.gz'))
 
         with patch_stream(sys.stdout) as buff:
-            warcio_main(['index', '-f', 'warc-target-uri', 'index.html.warc.gz'])
+            warcio_main(['index', '-f', 'warc-type,warc-target-uri', 'index.html.warc.gz'])
 
-        assert '"warc-target-uri": "http://www.iana.org/index.html"' in buff.getvalue().decode('utf-8')
-        assert '"warc-target-uri": "http://www.iana.org/"' in buff.getvalue().decode('utf-8')
+        buff = buff.getvalue().decode('utf-8')
+        assert '"warc-type": "warcinfo"' not in buff
+        assert '"warc-target-uri": "http://www.iana.org/index.html"' in buff
+        assert '"warc-target-uri": "http://www.iana.org/"' in buff
 
     def test_warcit_new_zip(self):
         with patch_stream() as buff:
@@ -160,8 +178,4 @@ class TestWarcIt(object):
 
         buff = buff.getvalue().decode('utf-8')
         assert 'www.iana.org.zip_nosuch" not a valid' in buff
-
-
-
-
 

@@ -6,11 +6,13 @@ import datetime
 import mimetypes
 import logging
 import zipfile
+import fnmatch
 
 from warcio.warcwriter import WARCWriter
 from warcio.timeutils import datetime_to_iso_date, timestamp_to_iso_date
 from warcio.timeutils import pad_timestamp, PAD_14_DOWN, DATE_TIMESPLIT
 from contextlib import closing
+from collections import OrderedDict
 
 
 # ============================================================================
@@ -30,15 +32,16 @@ def main(args=None):
     parser.add_argument('-a', '--append', action='store_true')
     parser.add_argument('-o', '--overwrite', action='store_true')
 
-    parser.add_argument('--prefix')
-
     parser.add_argument('--no-magic', action='store_true')
     parser.add_argument('--no-gzip', action='store_true')
+    parser.add_argument('--no-warcinfo', action='store_true')
 
     parser.add_argument('-q', '--quiet', action='store_true')
     parser.add_argument('-v', '--verbose', action='store_true')
 
     parser.add_argument('--index-files', default='index.html,index.htm')
+
+    parser.add_argument('-m', '--mime-overrides')
 
     r = parser.parse_args(args=args)
 
@@ -63,10 +66,12 @@ def main(args=None):
                   fixed_dt=r.fixed_dt,
                   gzip=not r.no_gzip,
                   magic=not r.no_magic,
+                  warcinfo=not r.no_warcinfo,
                   loglevel=loglevel,
                   mode=mode,
                   index_files=r.index_files,
-                  prefix=r.prefix,
+                  mime_overrides=r.mime_overrides,
+                  args=args,
                  ).run()
 
 
@@ -77,10 +82,12 @@ class WARCIT(object):
                  fixed_dt=None,
                  gzip=True,
                  magic=True,
+                 warcinfo=True,
                  loglevel=None,
                  mode='xb',
                  index_files=None,
-                 prefix=None):
+                 mime_overrides=None,
+                 args=None):
 
         self.logger = logging.getLogger('WARCIT')
         if loglevel:
@@ -92,6 +99,10 @@ class WARCIT(object):
         self.count = 0
         self.mode = mode
 
+        self.warcinfo = warcinfo
+        self.args = args or sys.argv
+        self.args[0] = 'warcit'
+
         self.fixed_dt = self._set_fixed_dt(fixed_dt)
 
         self.name = self._make_name(name)
@@ -100,6 +111,12 @@ class WARCIT(object):
             self.index_files = tuple(['/' + x.lower() for x in index_files.split(',')])
         else:
             self.index_files = tuple()
+
+        self.mime_overrides = {}
+        if mime_overrides:
+            for mime in mime_overrides.split(','):
+                p = mime.split('=', 1)
+                self.mime_overrides[p[0]] = p[1]
 
         self.magic = magic and self.load_magic()
 
@@ -154,11 +171,25 @@ class WARCIT(object):
         with closing(output):
             writer = WARCWriter(output, gzip=self.gzip)
 
+            self.make_warcinfo(writer)
+
             for file_info in self.iter_inputs():
                 self.make_record(writer, file_info)
 
         self.logger.info('Wrote {0} resources to {1}'.format(self.count, self.name))
         return 0
+
+    def make_warcinfo(self, writer):
+        if not self.warcinfo:
+            return
+
+        params = OrderedDict([('software', get_version() % dict(prog=self.args[0])),
+                              ('format', 'WARC File Format 1.0'),
+                              ('cmdline', ' '.join(self.args))
+                             ])
+
+        record = writer.create_warcinfo_record(self.name, params)
+        writer.write_record(record)
 
     def make_record(self, writer, file_info):
         if self.fixed_dt:
@@ -208,6 +239,11 @@ class WARCIT(object):
 
     def _guess_type(self, file_info):
         mime = None
+        if self.mime_overrides:
+            for pattern in self.mime_overrides:
+                if fnmatch.fnmatch(file_info.url, pattern):
+                    return self.mime_overrides[pattern]
+
         if self.magic:
             with file_info.open() as fh:
                 mime = self.magic.from_buffer(fh.read(2048))

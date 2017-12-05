@@ -2,6 +2,8 @@ WARCIT
 ======
 
 ``warcit`` is a command-line tool to convert directories of web documents (HTML, images, etc..) into a WARC files. ``warcit`` also supports converting ZIP archives into WARCs.
+The tool enables flat files on disk to be converted into
+
 
 Basic Usage
 -----------
@@ -19,17 +21,27 @@ For example, the following example will download a simple web site via ``wget`` 
 The WARC ``www.iana.org.warc.gz`` should now have been created!
 
 
-Mime Detection
-~~~~~~~~~~~~~~
+Mime Type Detection and Overrides
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``warcit`` uses the ``python-magic``/libmagic if it is installed for detecting the mime-type. To disable, ``python-magic``, use ``--no-magic``
-Otherwise, ``warcit`` guesses the mime-type based on the file extension
+``warcit`` uses the ``python-magic`` (libmagic) if it is installed for detecting the mime-type. To disable, ``python-magic``, use ``--no-magic``
+Otherwise, ``warcit`` guesses the mime type based on the file extension.
+
+However, specific overrides for mime-type can be set explicitly, via the ``--mime-overrides`` flag as a comma-delimeted property list::
+
+  warcit '--mime-overrides=*.html=text/html; charset="utf-8",*.ico=image/png' http://www.iana.org/ ./www.iana.org/
+
+When a url ending in ``*.html`` or ``*.ico`` is encountered, the specified mime type will be used for the ``Content-Type`` header, by passing any auto-detection.
 
 
 WARC Format
 ~~~~~~~~~~~
 
-``warcit`` produces WARC ``resource`` reccords for all files.
+The tool produces ISO standard WARC 1.0 files.
+
+A ``warcinfo`` record is added at the beginning of the WARC, unless the ``--no-warcinfo`` flag is specified.
+
+Each encountered file is stored as a WARC ``resource`` record.
 
 Additionally, ``warcit`` adds ``revisit`` records for top-level directories if index files are present.
 Index files can be specified via the ``--index-files`` flag, the default being ``--index-files=index.html,index.htm``
