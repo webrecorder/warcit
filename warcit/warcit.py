@@ -143,7 +143,7 @@ class WARCIT(object):
 
         # if no name, use basename of first input
         if not name:
-            name = os.path.basename(self.inputs[0].rstrip(os.path.sep))
+            name = os.path.basename(self.inputs[0].replace('/', os.path.sep).rstrip(os.path.sep))
 
         elif not name:
             name = 'warcit'
@@ -303,7 +303,7 @@ class WARCIT(object):
 # ============================================================================
 class FileInfo(object):
     def __init__(self, url_prefix, path, filename):
-        self.url = url_prefix + path.strip('./')
+        self.url = url_prefix + path.replace(os.path.sep, '/').strip('./')
         self.filename = filename
 
         stats = os.stat(filename)
