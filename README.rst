@@ -1,8 +1,13 @@
 WARCIT
 ======
 
-``warcit`` is a command-line tool to convert directories of web documents (HTML, images, etc..) into a WARC files. ``warcit`` also supports converting ZIP archives into WARCs.
-The tool enables flat files on disk to be converted into
+``warcit`` is a command-line tool to convert on-disk directories of web documents (HTML, images, and any related assets) into an ISO standard web archive (WARC) files.
+
+Conversion to WARC file allows for improved durability in a standardized format, and allows for any web files stored on disk to be uploaded into  `Webrecorder <https://github.com/webrecorder/webrecorder>`_, or replayed locally with `Webrecorder Player <https://github.com/webrecorder/webrecorderplayer-electron/releases>`_ or  `pywb <https://github.com/ikreymer/pywb>`_
+
+(Many other tools also operate on WARC files, see: `Awesome Web Archiving -- Tools and Software <https://github.com/iipc/awesome-web-archiving#tools--software>`_)
+
+WARCIT supports converting individual files, directories with nested directory structure, ZIP file archives into WARCs.
 
 
 Basic Usage
@@ -58,9 +63,11 @@ Each encountered file is stored as a WARC ``resource`` record.
 Additionally, ``warcit`` adds ``revisit`` records for top-level directories if index files are present.
 Index files can be specified via the ``--index-files`` flag, the default being ``--index-files=index.html,index.htm``
 
-For example, if a ``warcit http://example.com/ ./path/`` and there exists a ``./path/subdir/index.html``, warcit
-creates:
+For example, when running:
+``warcit http://example.com/ ./path/`` and there exists a file: ``./path/subdir/index.html``, warcit will create:
+
 - a ``resource`` record for ``http://example.com/path/subdir/index.html``
+
 - a ``revisit`` record for ``http://example.com/path/subdir/`` pointing to ``http://example.com/path/subdir/index.html``
 
 
