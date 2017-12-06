@@ -14,6 +14,10 @@ from warcio.timeutils import datetime_to_iso_date, timestamp_to_iso_date
 from warcio.timeutils import pad_timestamp, PAD_14_DOWN, DATE_TIMESPLIT
 from contextlib import closing
 from collections import OrderedDict
+from cchardet import UniversalDetector
+
+
+BUFF_SIZE = 2048
 
 
 # ============================================================================
@@ -30,7 +34,7 @@ def main(args=None):
                         help='''The base URL for all items to be included, including
                                 protocol. Example: https://cool.website:8080/files/''')
     parser.add_argument('inputs', nargs='+',
-                        help='''Paths of directories and/or files to be included in 
+                        help='''Paths of directories and/or files to be included in
                                 the WARC file.''')
 
     parser.add_argument('-d', '--fixed-dt',
@@ -47,13 +51,13 @@ def main(args=None):
 
     parser.add_argument('--use-magic', action='store_true')
     parser.add_argument('--no-warcinfo', action='store_true')
-    parser.add_argument('--no-gzip', 
+    parser.add_argument('--no-gzip',
                         help='''Do not compress WARC file.''',
                         action='store_true')
 
-    parser.add_argument('-c', '--charset', default='none', 
-                        help='''Set charset for text/* MIME types. Use "auto" for 
-                                automatically guessing, "none" (default) for not adding 
+    parser.add_argument('-c', '--charset',
+                        help='''Set charset for text/* MIME types. Use "auto" for
+                                automatically guessing, "none" (default) for not adding
                                 charset information.''',
                         metavar='charset')
 
@@ -61,12 +65,14 @@ def main(args=None):
     parser.add_argument('-v', '--verbose', action='store_true')
 
     parser.add_argument('--index-files', default='index.html,index.htm',
-                        help='''Comma separated list of filenames that should be treated as 
-                                index files: a revisit record with their base URL (up to the 
+                        help='''Comma separated list of filenames that should be treated as
+                                index files: a revisit record with their base URL (up to the
                                 next slash) will be created. Default is "index.html,index.htm".''',
                         metavar='name1,name2,...')
 
-    parser.add_argument('-m', '--mime-overrides')
+    parser.add_argument('-m', '--mime-overrides',
+                        help='''Specify mime overrides using the format: <file wildcard>=<mime>,<another file>=<mime>,...
+                                Example: --mime-overrides=*.php=text/html,image.img=image/png''')
 
     r = parser.parse_args(args=args)
 
@@ -109,7 +115,7 @@ class WARCIT(object):
                  gzip=True,
                  use_magic=False,
                  warcinfo=True,
-                 charset='none',
+                 charset=None,
                  loglevel=None,
                  mode='xb',
                  index_files=None,
@@ -149,6 +155,9 @@ class WARCIT(object):
         self.magic = None
 
         self.charset = charset
+        self.detector = None
+        if charset == 'auto':
+            self.detector = UniversalDetector()
 
     def _set_fixed_dt(self, fixed_dt):
         if not fixed_dt:
@@ -233,10 +242,9 @@ class WARCIT(object):
         else:
             warc_date = datetime_to_iso_date(file_info.modified_dt)
 
-        filename = file_info.filename
         url = file_info.url
 
-        source_uri = 'file://' + filename
+        source_uri = 'file://' + file_info.full_filename
 
         warc_headers = {'WARC-Date': warc_date,
                         'WARC-Source-URI': source_uri,
@@ -245,11 +253,10 @@ class WARCIT(object):
 
         warc_content_type = self._guess_type(file_info)
 
+        warc_content_type += self._guess_charset(warc_content_type,
+                                                 file_info)
+
         with file_info.open() as fh:
-
-            if warc_content_type.startswith('text/'):
-                warc_content_type += self._guess_charset(warc_content_type, filename)
-
             record = writer.create_warc_record(url, 'resource',
                                       payload=fh,
                                       length=file_info.size,
@@ -259,7 +266,8 @@ class WARCIT(object):
             self.count += 1
             writer.write_record(record)
 
-            self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(url, warc_content_type, warc_date, filename))
+            self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(url, warc_content_type, warc_date,
+                                                                              file_info.full_filename))
 
         if url.lower().endswith(self.index_files):
             self.add_index_revisit(writer, record, url, warc_date, source_uri)
@@ -291,31 +299,43 @@ class WARCIT(object):
         mime = None
         if self.magic:
             with file_info.open() as fh:
-                mime = self.magic.from_buffer(fh.read(2048))
+                mime = self.magic.from_buffer(fh.read(BUFF_SIZE))
 
         mime = mime or 'text/html'
 
         return mime
 
-    def _guess_charset(self, content_type, filename):
-        charset = None
-        if self.charset == 'none':
-            pass
-        elif self.charset == 'auto':
-            charset = chardet.detect(open(filename, 'rb').read())['encoding']
+    def _guess_charset(self, content_type, file_info):
+        charset = ''
+        if not content_type.startswith('text/') or not self.charset:
+            return ''
+
+        if self.detector:
+            self.detector.reset()
+            with file_info.open() as fh:
+                while not self.detector.done:
+                    buff = fh.read(BUFF_SIZE)
+                    if not buff:
+                        break
+
+                    self.detector.feed(buff)
+
+            self.detector.close()
+            if self.detector.result:
+                charset = self.detector.result['encoding']
+
             if charset == 'ascii':
                 charset = ''
+            else:
+                charset = charset.lower()
+
         else:
             charset = self.charset
 
         if charset:
-            return ';charset=' + charset
+            return '; charset=' + charset
         else:
             return ''
-
-    def join_url(self, path):
-        return self.url_prefix + path.strip('./')
-
 
     def iter_inputs(self):
         for input_ in self.inputs:
@@ -345,6 +365,7 @@ class WARCIT(object):
                                 continue
 
                             yield ZipFileInfo(self.url_prefix, zp, zinfo, zip_prefix)
+
     def parse_filename(self, filename):
         zip_path = []
         while filename:
@@ -370,6 +391,8 @@ class FileInfo(object):
         self.url = url_prefix + path.replace(os.path.sep, '/').strip('./')
         self.filename = filename
 
+        self.full_filename = filename
+
         stats = os.stat(filename)
         self.modified_dt = datetime.datetime.utcfromtimestamp(stats.st_mtime)
         self.size = stats.st_size
@@ -380,10 +403,12 @@ class FileInfo(object):
 
 # ============================================================================
 class ZipFileInfo(object):
-    def __init__(self, url_prefix, zp, zinfo, prefix=None):
+    def __init__(self, url_prefix, zp, zinfo, prefix):
         filename = zinfo.filename
         if prefix and filename.startswith(prefix):
             filename = filename[len(prefix):]
+
+        self.full_filename = zp.filename + '/' + zinfo.filename
 
         self.url = url_prefix + filename.strip('./')
         self.filename = zinfo.filename

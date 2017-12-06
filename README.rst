@@ -26,8 +26,8 @@ For example, the following example will download a simple web site via ``wget`` 
 The WARC ``www.iana.org.warc.gz`` should now have been created!
 
 
-Mime Type Detection and Overrides
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Mime Type, Detection and Overrides
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 By default, ``warcit`` supports the the default Python ``mimetypes`` library to determine a mime type based on a file extension.
 
@@ -49,6 +49,18 @@ The ``--mime-overrides`` flag can be used to specify wildcard query (applied to 
   warcit '--mime-overrides=*.html=text/html; charset="utf-8",image.ico=image/png' http://www.iana.org/ ./www.iana.org/
 
 When a url ending in ``*.html`` or ``*.ico`` is encountered, the specified mime type will be used for the ``Content-Type`` header, by passing any auto-detection.
+
+
+Charset Detection
+~~~~~~~~~~~~~~~~~
+
+Charset detection is disabled by default, but can be enabled with the ``--charset auto`` flag.
+
+This will use the `cchardet <https://pypi.python.org/pypi/cchardet/2.1.1>`_ native detection library.
+
+A specific charset can also be specified, eg. ``--charset utf-8`` will add ``; charset=utf-8`` to all ``text/*`` resources.
+
+If detection does not produce a result, or if the result is ``ascii``, no charset is added to the ``Content-Type``.
 
 
 WARC Format
