@@ -14,7 +14,7 @@ from warcio.timeutils import datetime_to_iso_date, timestamp_to_iso_date
 from warcio.timeutils import pad_timestamp, PAD_14_DOWN, DATE_TIMESPLIT
 from contextlib import closing
 from collections import OrderedDict
-from cchardet import UniversalDetector
+import cchardet
 
 
 BUFF_SIZE = 2048
@@ -145,6 +145,7 @@ class WARCIT(object):
         else:
             self.index_files = tuple()
 
+        self._init_mimes()
         self.mime_overrides = {}
         if mime_overrides:
             for mime in mime_overrides.split(','):
@@ -155,9 +156,10 @@ class WARCIT(object):
         self.magic = None
 
         self.charset = charset
-        self.detector = None
-        if charset == 'auto':
-            self.detector = UniversalDetector()
+
+    def _init_mimes(self):
+        # add any custom, fixed mime types here
+         mimetypes.add_type('image/x-icon', '.ico', True)
 
     def _set_fixed_dt(self, fixed_dt):
         if not fixed_dt:
@@ -310,24 +312,16 @@ class WARCIT(object):
         if not content_type.startswith('text/') or not self.charset:
             return ''
 
-        if self.detector:
-            self.detector.reset()
+        if self.charset == 'auto':
             with file_info.open() as fh:
-                while not self.detector.done:
-                    buff = fh.read(BUFF_SIZE)
-                    if not buff:
-                        break
+                result = cchardet.detect(fh.read())
 
-                    self.detector.feed(buff)
+            if result:
+                charset = result['encoding']
 
-            self.detector.close()
-            if self.detector.result:
-                charset = self.detector.result['encoding']
-
+            charset = charset.lower()
             if charset == 'ascii':
                 charset = ''
-            else:
-                charset = charset.lower()
 
         else:
             charset = self.charset

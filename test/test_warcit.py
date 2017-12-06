@@ -90,8 +90,7 @@ class TestWarcIt(object):
         warcio_main(['index', '-f', 'warc-target-uri,content-type', 'test3.warc.gz'])
 
         out, err = capsys.readouterr()
-
-        assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=utf-8"' in out
+        assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=windows-1252"' in out
         assert '"warc-target-uri": "http://www.iana.org/_css/2015.1/print.css", "content-type": "text/css; charset=utf-8"' in out
         assert '"warc-target-uri": "http://www.iana.org/_img/bookmark_icon.ico", "content-type": "image/x-icon"' in out
 
