@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
 import glob
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 
 
 class PyTest(TestCommand):
@@ -34,6 +34,7 @@ setup(
         ],
     install_requires=[
         'warcio',
+        'cchardet'
         ],
     zip_safe=True,
     entry_points="""

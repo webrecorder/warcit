@@ -50,6 +50,18 @@ The ``--mime-overrides`` flag can be used to specify wildcard query (applied to 
 
 When a url ending in ``*.html`` or ``*.ico`` is encountered, the specified mime type will be used for the ``Content-Type`` header, by passing any auto-detection.
 
+Charset Detection
+~~~~~~~~~~~~~~~~~
+
+Charset detection is disabled by default, but can be enabled with the ``--charset auto`` flag.
+
+Detection is done using the `cchardet <https://pypi.python.org/pypi/cchardet/2.1.1>`_ native chardet library.
+
+A specific charset can also be specified, eg. ``--charset utf-8`` will add ``; charset=utf-8`` to all ``text/*`` resources.
+
+If detection does not produce a result, or if the result is ``ascii``, no charset is added to the ``Content-Type``.
+
+
 ZIP Files
 ~~~~~~~~~
 
