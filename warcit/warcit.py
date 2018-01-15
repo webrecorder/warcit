@@ -43,22 +43,47 @@ def main(args=None):
                         metavar='timestamp')
 
     parser.add_argument('-n', '--name',
-                        help='''base name for WARC file''',
+                        help='''Base name for WARC file, appropriate extension will be
+                                added automatically.''',
                         metavar='name')
 
     parser.add_argument('-a', '--append', action='store_true')
     parser.add_argument('-o', '--overwrite', action='store_true')
+   
 
-    parser.add_argument('--use-magic', action='store_true')
-    parser.add_argument('--no-warcinfo', action='store_true')
+    parser.add_argument('--use-magic', '--magic',
+                        help='''Select method for MIME type guessing:
+                                "filename" to pick file types depending on filename extensions (default),
+                                "magic" to use python-magic,
+                                "tika" to use Apache Tika.''',
+                        default='filename',
+                        const='filename',
+                        nargs='?',
+                        choices=['filename', 'magic', 'tika'])
+
+    parser.add_argument('--no-xhtml',
+                        help='''If the content type "application/xhtml+xml" is detected,
+                                use "text/html" instead.''',
+                        action='store_true')
+
+    parser.add_argument('-m', '--mime-overrides',
+                        help='''Specify mime overrides using the format: <file wildcard>=<mime>,<another file>=<mime>,...
+                                Example: --mime-overrides=*.php=text/html,image.img=image/png''')
+
+    parser.add_argument('--no-warcinfo',
+                        help='''Do not include technical information about the resulting
+                                WARC file's creation.''',
+                        action='store_true')
+    
     parser.add_argument('--no-gzip',
                         help='''Do not compress WARC file.''',
                         action='store_true')
 
     parser.add_argument('-c', '--charset',
-                        help='''Set charset for text/* MIME types. Use "auto" for
-                                automatically guessing, "none" (default) for not adding
-                                charset information.''',
+                        help='''Set charset for text/* MIME types. 
+                                Use "cchardet" for guessing via cchardet, 
+                                "tika" for guessing via Apache Tika,
+                                "none" (default) for not adding charset information.''',
                         metavar='charset')
 
     parser.add_argument('-q', '--quiet', action='store_true')
@@ -70,9 +95,7 @@ def main(args=None):
                                 next slash) will be created. Default is "index.html,index.htm".''',
                         metavar='name1,name2,...')
 
-    parser.add_argument('-m', '--mime-overrides',
-                        help='''Specify mime overrides using the format: <file wildcard>=<mime>,<another file>=<mime>,...
-                                Example: --mime-overrides=*.php=text/html,image.img=image/png''')
+
 
     r = parser.parse_args(args=args)
 
@@ -103,6 +126,7 @@ def main(args=None):
                   mode=mode,
                   index_files=r.index_files,
                   mime_overrides=r.mime_overrides,
+                  no_xhtml=r.no_xhtml,
                   args=args,
                  ).run()
 
@@ -120,6 +144,7 @@ class WARCIT(object):
                  mode='xb',
                  index_files=None,
                  mime_overrides=None,
+                 no_xhtml=False,
                  args=None):
 
         self.logger = logging.getLogger('WARCIT')
@@ -153,9 +178,11 @@ class WARCIT(object):
                 self.mime_overrides[p[0]] = p[1]
 
         self.use_magic = use_magic
-        self.magic = None
+        self.no_xhtml = no_xhtml
 
         self.charset = charset
+
+        self.use_tika = self.use_magic == 'tika' or self.charset == 'tika'
 
     def _init_mimes(self):
         # add any custom, fixed mime types here
@@ -180,6 +207,16 @@ class WARCIT(object):
             self.logger.error('python-magic or libmagic is not available, please install or run without --use-magic flag')
             return False
 
+    def load_tika(self):
+        try:
+            from tika import parser as tika_parser
+            self.tika_parser = tika_parser
+            self.tika_parser.from_buffer('Tika Test.')
+            return True
+        except Exception as e:
+            self.logger.error(e)
+            self.logger.error('Apache Tika not available, please set up or use another method for Content-Type or encoding detection.')
+
     def _make_name(self, name):
         """ Set WARC file name, use defaults when needed
         """
@@ -203,8 +240,11 @@ class WARCIT(object):
         return name
 
     def run(self):
-        if self.use_magic:
+        if self.use_magic == 'magic':
             if not self.load_magic():
+                return 1
+        if self.use_tika:
+            if not self.load_tika():
                 return 1
 
         try:
@@ -253,10 +293,15 @@ class WARCIT(object):
                         'WARC-Created-Date': writer._make_warc_date()
                        }
 
-        warc_content_type = self._guess_type(file_info)
+        if self.use_tika:
+            self.tika_results = self.tika_parser.from_file(file_info.full_filename)
 
+        warc_content_type = self._guess_type(file_info)
         warc_content_type += self._guess_charset(warc_content_type,
                                                  file_info)
+
+        if self.use_tika:
+            del self.tika_results
 
         with file_info.open() as fh:
             record = writer.create_warc_record(url, 'resource',
@@ -271,6 +316,7 @@ class WARCIT(object):
             self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(url, warc_content_type, warc_date,
                                                                               file_info.full_filename))
 
+        # Current file serves as a directory index
         if url.lower().endswith(self.index_files):
             self.add_index_revisit(writer, record, url, warc_date, source_uri)
 
@@ -294,14 +340,31 @@ class WARCIT(object):
                 if fnmatch.fnmatch(file_info.url, pattern):
                     return self.mime_overrides[pattern]
 
-        mime = mimetypes.guess_type(file_info.url.split('?', 1)[0], False)
-        if mime[0]:
-            return mime[0]
-
         mime = None
-        if self.magic:
+
+        if self.use_magic == 'filename':
+            mime = mimetypes.guess_type(file_info.url.split('?', 1)[0], False)
+            if len(mime) == 2:
+                mime = mime[0]
+        
+        elif self.use_magic == 'magic':
             with file_info.open() as fh:
                 mime = self.magic.from_buffer(fh.read(BUFF_SIZE))
+        
+        elif self.use_magic == 'tika':
+            # Tika might not return a Content-Type, a string, or a list.
+            # In case of a list, the first (most likely) value is chosen. 
+            try:
+                tika_content_type = self.tika_results['metadata']['Content-Type']
+                if isinstance(tika_content_type, list):
+                    tika_content_type = tika_content_type[0]
+                
+                mime = tika_content_type.split(';', 1)[0]
+            except:
+                mime = None
+
+        if self.no_xhtml and mime=='application/xhtml+xml':
+            mime = 'text/html'
 
         mime = mime or 'text/html'
 
@@ -312,15 +375,42 @@ class WARCIT(object):
         if not content_type.startswith('text/') or not self.charset:
             return ''
 
-        if self.charset == 'auto':
+        if self.charset == 'cchardet':
             with file_info.open() as fh:
                 result = cchardet.detect(fh.read())
 
             if result:
                 charset = result['encoding']
 
-            charset = charset.lower()
-            if charset == 'ascii':
+            # cchardet is happy to detect ascii, which usually
+            # meas that no content type was specified. In that 
+            # case, do not return charset information completely,
+            # as the browser will have to figure it out.
+            if charset.lower() == 'ascii':
+                charset = ''
+
+        elif self.charset == 'tika':
+            # Tika might not return a Content-Encoding, a string, or a list.
+            # In case of a list, the first (most likely) value is chosen.
+            try:
+                tika_charset = self.tika_results['metadata']['Content-Encoding']
+                if isinstance(tika_charset, list):
+                    tika_charset = tika_charset[0]
+
+                # Tika assigns the charset "windows-1252" with Windows line breaks,
+                # or "ISO-8859-1" with Unix line breaks, if the file
+                # has an unspecified 8 bit encoding. Unless this
+                # encoding has been specified in the file, it should be
+                # removed. If there has been any "Content-Type-Hint" been
+                # found by Tika, it can be safely assumed that the detected
+                # charset is not a default assignment.
+                if tika_charset in ['windows-1252', 'ISO-8859-1']:
+                    if not 'Content-Type-Hint' in self.tika_results['metadata']:
+                        tika_charset = ''
+
+                charset = tika_charset
+            except Exception as e:
+                self.logger.debug(e)
                 charset = ''
 
         else:
