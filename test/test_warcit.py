@@ -170,7 +170,7 @@ class TestWarcIt(object):
 
     def test_with_magic(self, caplog):
         pytest.importorskip('magic')
-        res = main(['-q', '-o', '--use-magic', '-n', 'test', 'http://www.iana.org/', self.test_dir])
+        res = main(['-q', '-o', '--use-magic', 'magic', '-n', 'test', 'http://www.iana.org/', self.test_dir])
         assert res == 0
 
     def test_no_magic(self, caplog):
