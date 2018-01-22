@@ -216,6 +216,7 @@ class WARCIT(object):
         except Exception as e:
             self.logger.error(e)
             self.logger.error('Apache Tika not available, please set up or use another method for Content-Type or encoding detection.')
+            return False
 
     def _make_name(self, name):
         """ Set WARC file name, use defaults when needed
