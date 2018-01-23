@@ -92,7 +92,6 @@ class TestWarcIt(object):
         out, err = capsys.readouterr()
         assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=windows-1252"' in out
         assert '"warc-target-uri": "http://www.iana.org/_css/2015.1/print.css", "content-type": "text/css; charset=utf-8"' in out
-        assert '"warc-target-uri": "http://www.iana.org/_img/bookmark_icon.ico", "content-type": "image/x-icon"' in out
 
     def test_warcit_use_charset_custom(self, capsys):
         res = main(['-q', '-o', '-n', 'test3', '--charset', 'custom', 'http://www.iana.org/', self.test_dir])
@@ -104,7 +103,6 @@ class TestWarcIt(object):
 
         assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=custom"' in out
         assert '"warc-target-uri": "http://www.iana.org/_css/2015.1/print.css", "content-type": "text/css; charset=custom"' in out
-        assert '"warc-target-uri": "http://www.iana.org/_img/bookmark_icon.ico", "content-type": "image/x-icon"' in out
 
     def test_warcit_mime_override(self, capsys):
         res = main(['-q', '-n', 'test2', '--mime-overrides=*/index.html=custom/mime', 'http://www.iana.org/', self.test_dir])
