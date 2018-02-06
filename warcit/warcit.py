@@ -19,11 +19,17 @@ import cchardet
 
 BUFF_SIZE = 2048
 
+# ============================================================================
+if sys.version_info < (3, 3):  #pragma: no cover
+    xb_supported = False
+else:  #pragma: no cover
+    xb_supported = True
+
 
 # ============================================================================
 def main(args=None):
-    if sys.version_info < (3, 4):  #pragma: no cover
-        print('Sorry, warcit requires python >= 3.4, you are running {0}'.format(sys.version.split(' ')[0]))
+    if sys.version_info < (2, 7):  #pragma: no cover
+        print('Sorry, warcit requires python >= 2.7, you are running {0}'.format(sys.version.split(' ')[0]))
         return 1
 
     parser = ArgumentParser(description='Convert Directories and Files to Web Archive (WARC)')
@@ -391,8 +397,17 @@ class WARCIT(object):
                 return 1
 
         try:
-            output = open(self.name, self.mode)
-        except FileExistsError as e:
+            if self.mode == 'xb' and not xb_supported:  #pragma: no cover
+                fd = os.open(self.name, os.O_EXCL | os.O_CREAT | os.O_WRONLY)
+                output = os.fdopen(fd, 'w', 0x664)
+            else:
+                output = open(self.name, self.mode)
+        except OSError as e:
+            # ensure only file exists handling
+            import errno
+            if e.errno != errno.EEXIST:
+                raise
+
             self.logger.error(e)
             self.logger.error('* Use -a/--append to append to an existing WARC file')
             self.logger.error('* Use -o/--overwrite to overwrite existing WARC file')

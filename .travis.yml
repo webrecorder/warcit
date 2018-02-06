@@ -1,6 +1,7 @@
 language: python
 
 python:
+  - "2.7"
   - "3.4"
   - "3.5"
   - "3.6"
@@ -12,11 +13,11 @@ sudo: false
 
 install:
   - python setup.py install
-  - pip install -U pytest coverage pytest-cov coveralls
+  - pip install -U pytest coverage pytest-cov codecov
 
 script:
   - python setup.py test
 
 after_success:
-  - coveralls
+  - codecov
 
