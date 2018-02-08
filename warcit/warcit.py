@@ -4,7 +4,6 @@ import os
 import sys
 import datetime
 import mimetypes
-import chardet
 import logging
 import zipfile
 import fnmatch
@@ -472,8 +471,13 @@ class WARCIT(object):
 
 # ============================================================================
 class FileInfo(object):
+
     def __init__(self, url_prefix, path, filename):
-        self.url = url_prefix + path.replace(os.path.sep, '/').strip('./')
+        url = path.replace(os.path.sep, '/').strip('./')
+        for replace_char in '#;?:@&=+$, ': # see RFC 2396, plus '#' and ' '
+            url = url.replace(replace_char, '%%%x' % ord(replace_char))
+        self.url = url_prefix + url
+
         self.filename = filename
 
         self.full_filename = filename
