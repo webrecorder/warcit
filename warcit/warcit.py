@@ -7,6 +7,7 @@ import mimetypes
 import logging
 import zipfile
 import fnmatch
+import csv
 
 from warcio.warcwriter import WARCWriter
 from warcio.timeutils import datetime_to_iso_date, timestamp_to_iso_date
@@ -121,6 +122,10 @@ def main(args=None):
                                 will match a second file.''',
                         metavar='<FILENAME>')
 
+    parser.add_argument('--log',
+                        help='''Write a log file in CSV format.''',
+                        metavar='<FILENAME>')
+
 
     r = parser.parse_args(args=args)
 
@@ -155,6 +160,7 @@ def main(args=None):
                   mapfile=r.mapfile,
                   include=r.include,
                   exclude=r.exclude,
+                  logfile=r.log,
                   args=args,
                  ).run()
 
@@ -176,6 +182,7 @@ class WARCIT(object):
                  mapfile=None,
                  include=False,
                  exclude=False,
+                 logfile=None,
                  args=None):
 
         self.logger = logging.getLogger('WARCIT')
@@ -227,7 +234,10 @@ class WARCIT(object):
             self.use_mapfile = True
             self.mapfile = mapfile
 
-
+        self.logfile = logfile
+        self.use_logfile = False
+        if self.logfile:
+            self.use_logfile = True
 
     def _init_mimes(self):
         # add any custom, fixed mime types here
@@ -251,7 +261,6 @@ class WARCIT(object):
             return False
 
         self.filemap = []
-        import csv
         
         with closing(mapfile_h):
             try:
@@ -279,6 +288,30 @@ class WARCIT(object):
                 self.filemap.append(row)
 
             return True
+
+    def init_logfile(self):
+        try:
+            self.logfile_h = open(self.logfile, 'w', newline='')
+        except Exception as e:
+            self.logger.error(e)
+            self.logger.error('Logfile {} could not be opened for writing.'.format(self.logfile))
+            return False
+
+        self.logfile_writer = csv.DictWriter(self.logfile_h, fieldnames=['file', 'Record-Type', 
+                                                                         'URL', 'timestamp',
+                                                                         'Content-Type', 'mime', 
+                                                                         'charset'])
+        self.logfile_writer.writeheader()
+        
+        return True
+
+    def write_logfile(self, row):
+        if self.use_logfile:
+            self.logfile_writer.writerow(row)
+
+    def close_logfile(self):
+        if self.use_logfile:
+            self.logfile_h.close()
 
     def _match_mapfile(self, filename):
         for row in self.filemap:
@@ -353,8 +386,10 @@ class WARCIT(object):
         if self.use_mapfile:
             if not self.load_mapfile():
                 return 1
+        if self.use_logfile:
+            if not self.init_logfile():
+                return 1
 
-        print('lol')
         try:
             output = open(self.name, self.mode)
         except FileExistsError as e:
@@ -372,6 +407,9 @@ class WARCIT(object):
                 self.make_record(writer, file_info)
 
         self.logger.info('Wrote {0} resources to {1}'.format(self.count, self.name))
+
+        self.close_logfile()
+
         return 0
 
     def make_warcinfo(self, writer):
@@ -403,13 +441,14 @@ class WARCIT(object):
         # type and encoding
         if self.use_tika:
             self.tika_results = self.tika_parser.from_file(file_info.full_filename)
+            self.logfile_row['source'] = 'tika'
 
         if self.use_mapfile:
             self.mapfile_results = self._match_mapfile(file_info.full_filename)
 
-        warc_content_type = self._guess_type(file_info)
-        warc_content_type += self._guess_charset(warc_content_type,
-                                                 file_info)
+        mime_type = self._guess_type(file_info)
+        encoding = self._guess_charset(mime_type, file_info)
+        warc_content_type = mime_type + encoding;
 
         # target URL
         if self.use_mapfile and self.mapfile_results and 'URL' in self.mapfile_results:
@@ -419,7 +458,7 @@ class WARCIT(object):
 
         # timestamp
         if self.use_mapfile and self.mapfile_results and 'timestamp' in self.mapfile_results:
-            warc_date = self.mapfile_results['timestamp']
+            warc_date = self._set_fixed_dt(self.mapfile_results['timestamp'])
         elif self.fixed_dt:
             warc_date = self.fixed_dt
         else:
@@ -449,6 +488,17 @@ class WARCIT(object):
             self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(url, warc_content_type, warc_date,
                                                                               file_info.full_filename))
 
+            
+        self.write_logfile({
+            'file': file_info.full_filename,
+            'Record-Type': 'Resource',
+            'URL': url,
+            'timestamp': warc_date,
+            'Content-Type': warc_content_type,
+            'mime': mime_type,
+            'charset': encoding[10:] # minus '; charset='
+            })
+
 
         if self.use_tika:
             del self.tika_results
@@ -473,11 +523,18 @@ class WARCIT(object):
         self.count += 1
         writer.write_record(revisit_record)
 
+        self.write_logfile({
+            'file': source_uri[7:], # shave off 'file://' in beginning
+            'Record-Type': 'Revisit',
+            'URL': index_url,
+            'timestamp': warc_date,
+            })
+
     def _guess_type(self, file_info):
         if self.use_mapfile:
             if self.mapfile_results:
                 if 'Content-Type' in self.mapfile_results:
-                    return self.mapfile_results['Content-Type']
+                    return self.mapfile_results['Content-Type'].split(';')[0]
 
         if self.mime_overrides:
             for pattern in self.mime_overrides:
@@ -517,7 +574,8 @@ class WARCIT(object):
     def _guess_charset(self, content_type, file_info):
         if self.use_mapfile:
             if self.mapfile_results:
-                return '' # mapfile always defines complete Content-Type
+                if 'Content-Type' in self.mapfile_results and ';' in self.mapfile_results['Content-Type']:
+                    return ';' + self.mapfile_results['Content-Type'].split(';')[1]
 
         charset = ''
         if not content_type.startswith('text/') or not self.charset:
