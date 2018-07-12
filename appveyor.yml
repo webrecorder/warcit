@@ -14,14 +14,14 @@ environment:
 
 install:        
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
-  - "pip install --disable-pip-version-check --user --upgrade pip"
-  - "pip install -U setuptools pytest"
-  - "pip install coverage pytest-cov coveralls"
+  - "python -m pip install --disable-pip-version-check --user --upgrade pip"
+  - "%CMD_IN_ENV% pip install -U setuptools pytest"
+  - "%CMD_IN_ENV% pip install coverage pytest-cov coveralls"
 
 build_script:
-  - "python setup.py install"
+  - "%CMD_IN_ENV% python setup.py install"
 
 test_script:
-  - "python setup.py test"
+  - "%CMD_IN_ENV% python setup.py test"
 
 
