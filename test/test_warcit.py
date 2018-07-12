@@ -84,15 +84,15 @@ class TestWarcIt(object):
         assert '"warc-target-uri": "http://www.iana.org/index.html", "warc-date": "2010-12-26T10:11:12Z", "content-type": "text/html"' in out
 
     def test_warcit_use_charset_auto_detect(self, capsys):
-        res = main(['-q', '-n', 'test3', '--charset', 'auto', 'http://www.iana.org/', self.test_dir])
+        res = main(['-q', '-n', 'test3', '--charset', 'cchardet', 'http://www.iana.org/', self.test_dir])
         assert res == 0
 
         warcio_main(['index', '-f', 'warc-target-uri,content-type', 'test3.warc.gz'])
 
         out, err = capsys.readouterr()
+        out = out.lower() # charset names might be uppercase or lowercase
         assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=windows-1252"' in out
         assert '"warc-target-uri": "http://www.iana.org/_css/2015.1/print.css", "content-type": "text/css; charset=utf-8"' in out
-        assert '"warc-target-uri": "http://www.iana.org/_img/bookmark_icon.ico", "content-type": "image/x-icon"' in out
 
     def test_warcit_use_charset_custom(self, capsys):
         res = main(['-q', '-o', '-n', 'test3', '--charset', 'custom', 'http://www.iana.org/', self.test_dir])
@@ -104,7 +104,6 @@ class TestWarcIt(object):
 
         assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=custom"' in out
         assert '"warc-target-uri": "http://www.iana.org/_css/2015.1/print.css", "content-type": "text/css; charset=custom"' in out
-        assert '"warc-target-uri": "http://www.iana.org/_img/bookmark_icon.ico", "content-type": "image/x-icon"' in out
 
     def test_warcit_mime_override(self, capsys):
         res = main(['-q', '-n', 'test2', '--mime-overrides=*/index.html=custom/mime', 'http://www.iana.org/', self.test_dir])
@@ -170,14 +169,14 @@ class TestWarcIt(object):
 
     def test_with_magic(self, caplog):
         pytest.importorskip('magic')
-        res = main(['-q', '-o', '--use-magic', '-n', 'test', 'http://www.iana.org/', self.test_dir])
+        res = main(['-q', '-o', '--use-magic', 'magic', '-n', 'test', 'http://www.iana.org/', self.test_dir])
         assert res == 0
 
     def test_no_magic(self, caplog):
         import sys
         sys.modules['magic'] = None
 
-        res = main(['-q', '--use-magic', '-n', 'test', 'http://www.iana.org/', self.test_dir])
+        res = main(['-q', '--use-magic', 'magic', '-n', 'test', 'http://www.iana.org/', self.test_dir])
         assert res == 1
         assert "python-magic or libmagic is not available" in caplog.text
 

@@ -1,6 +1,6 @@
 environment:
   global:
-    CMD_IN_ENV: "cmd /E:ON /V:ON /C obvci_appveyor_python_build_env.cmd"
+     CMD_IN_ENV: "cmd /E:ON /V:ON /C obvci_appveyor_python_build_env.cmd"
 
   matrix:
     - PYTHON: "C:\\Python34"
@@ -12,9 +12,9 @@ environment:
     - PYTHON: "C:\\Python36"
     - PYTHON: "C:\\Python36-x64"
 
-install:        
+install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
-  - "pip install --disable-pip-version-check --user --upgrade pip"
+  - "python -m pip install --disable-pip-version-check --user --upgrade pip"
   - "pip install -U setuptools pytest"
   - "pip install coverage pytest-cov coveralls"
 
