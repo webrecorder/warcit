@@ -441,7 +441,6 @@ class WARCIT(object):
         # type and encoding
         if self.use_tika:
             self.tika_results = self.tika_parser.from_file(file_info.full_filename)
-            self.logfile_row['source'] = 'tika'
 
         if self.use_mapfile:
             self.mapfile_results = self._match_mapfile(file_info.full_filename)
