@@ -4,10 +4,10 @@ import os
 import sys
 import datetime
 import mimetypes
-import chardet
 import logging
 import zipfile
 import fnmatch
+import csv
 
 from warcio.warcwriter import WARCWriter
 from warcio.timeutils import datetime_to_iso_date, timestamp_to_iso_date
@@ -40,26 +40,63 @@ def main(args=None):
     parser.add_argument('-d', '--fixed-dt',
                         help='''Set resource date and time in YYYYMMDDHHMMSS format.
                                 If not given, last modified date of files is used.''',
-                        metavar='timestamp')
+                        metavar='<TIMESTAMP>')
 
     parser.add_argument('-n', '--name',
-                        help='''base name for WARC file''',
+                        help='''Base name for WARC file, appropriate extension will be
+                                added automatically.''',
                         metavar='name')
 
     parser.add_argument('-a', '--append', action='store_true')
     parser.add_argument('-o', '--overwrite', action='store_true')
+   
 
-    parser.add_argument('--use-magic', action='store_true')
-    parser.add_argument('--no-warcinfo', action='store_true')
+    parser.add_argument('--use-magic', '--magic',
+                        help='''Select method for MIME type guessing:
+                                "filename" to pick file types depending on filename extensions (default),
+                                "magic" to use python-magic,
+                                "tika" to use Apache Tika.''',
+                        default='filename',
+                        const='filename',
+                        nargs='?',
+                        choices=['filename', 'magic', 'tika'])
+
+    parser.add_argument('--no-xhtml',
+                        help='''If the content type "application/xhtml+xml" is detected,
+                                use "text/html" instead.''',
+                        action='store_true')
+
+    parser.add_argument('-m', '--mime-overrides',
+                        help='''Specify mime overrides using the format: <wildcard>=<mime>,<file>=<mime>,...
+                                Example: --mime-overrides=*.php=text/html,image.img=image/png''',
+                        metavar='<PATTERN=MIMETYPE>[,...]')
+
+    parser.add_argument('--exclude',
+                        help='''Comma separated wildcard patterns of file names to exclude from the WARC.
+                                Example: --exclude '*.asp,*.jpeg' ''',
+                        metavar='<PATTERN>,...')
+    parser.add_argument('--include',
+                        help='''Comma separated wildcard patterns of file names to include in the WARC.
+                                If used without --exclude, only files matching the --include patterns
+                                are processed. If used together with --exclude, files matching
+                                --include will override exclude rules.''')
+
+
+    parser.add_argument('--no-warcinfo',
+                        help='''Do not include technical information about the resulting
+                                WARC file's creation.''',
+                        action='store_true')
+    
     parser.add_argument('--no-gzip',
                         help='''Do not compress WARC file.''',
                         action='store_true')
 
     parser.add_argument('-c', '--charset',
-                        help='''Set charset for text/* MIME types. Use "auto" for
-                                automatically guessing, "none" (default) for not adding
-                                charset information.''',
-                        metavar='charset')
+                        help='''Set charset for text/* MIME types. 
+                                Use "cchardet" for guessing via cchardet, 
+                                "tika" for guessing via Apache Tika,
+                                "none" (default) for not adding charset information.''',
+                        metavar='{<ENCODING>, cchardet, tika, none}')
 
     parser.add_argument('-q', '--quiet', action='store_true')
     parser.add_argument('-v', '--verbose', action='store_true')
@@ -68,11 +105,27 @@ def main(args=None):
                         help='''Comma separated list of filenames that should be treated as
                                 index files: a revisit record with their base URL (up to the
                                 next slash) will be created. Default is "index.html,index.htm".''',
-                        metavar='name1,name2,...')
+                        metavar='<FILENAME>[,...]')
 
-    parser.add_argument('-m', '--mime-overrides',
-                        help='''Specify mime overrides using the format: <file wildcard>=<mime>,<another file>=<mime>,...
-                                Example: --mime-overrides=*.php=text/html,image.img=image/png''')
+    parser.add_argument('--mapfile',
+                        help='''CSV or TSV file (detected by file extension) that maps file names to desired
+                                information in the resulting WARC.
+                                This feature exists to allow creating WARCs that don't neccessarily match
+                                the file structure on disc.
+                                A header row is expected with these possible column headers:
+                                "file" -- a string with the rightmost part of the file path.
+                                "URL" -- the target URL for the data contained in the file.
+                                "timestamp" -- timestamp in YYYYMMDDHHMMSS format.
+                                "Content-Type" -- string with desired MIME information.
+                                If during the warcing process a file is encountered matching the "file" column, it will
+                                be treated according to the mapfile, and an error will the thrown if the filename
+                                will match a second file.''',
+                        metavar='<FILENAME>')
+
+    parser.add_argument('--log',
+                        help='''Write a log file in CSV format.''',
+                        metavar='<FILENAME>')
+
 
     r = parser.parse_args(args=args)
 
@@ -103,6 +156,11 @@ def main(args=None):
                   mode=mode,
                   index_files=r.index_files,
                   mime_overrides=r.mime_overrides,
+                  no_xhtml=r.no_xhtml,
+                  mapfile=r.mapfile,
+                  include=r.include,
+                  exclude=r.exclude,
+                  logfile=r.log,
                   args=args,
                  ).run()
 
@@ -120,6 +178,11 @@ class WARCIT(object):
                  mode='xb',
                  index_files=None,
                  mime_overrides=None,
+                 no_xhtml=False,
+                 mapfile=None,
+                 include=False,
+                 exclude=False,
+                 logfile=None,
                  args=None):
 
         self.logger = logging.getLogger('WARCIT')
@@ -153,13 +216,32 @@ class WARCIT(object):
                 self.mime_overrides[p[0]] = p[1]
 
         self.use_magic = use_magic
-        self.magic = None
+        self.no_xhtml = no_xhtml
 
         self.charset = charset
 
+        self.include = None
+        if include:
+            self.include = [x.lower() for x in include.split(',')]
+        self.exclude = None
+        if exclude:
+            self.exclude = [x.lower() for x in exclude.split(',')]
+
+        self.use_tika = self.use_magic == 'tika' or self.charset == 'tika'
+
+        self.use_mapfile = False
+        if mapfile:
+            self.use_mapfile = True
+            self.mapfile = mapfile
+
+        self.logfile = logfile
+        self.use_logfile = False
+        if self.logfile:
+            self.use_logfile = True
+
     def _init_mimes(self):
         # add any custom, fixed mime types here
-         mimetypes.add_type('image/x-icon', '.ico', True)
+        mimetypes.add_type('image/x-icon', '.ico', True)
 
     def _set_fixed_dt(self, fixed_dt):
         if not fixed_dt:
@@ -170,6 +252,87 @@ class WARCIT(object):
         fixed_dt = timestamp_to_iso_date(fixed_dt)
         return fixed_dt
 
+    def load_mapfile(self):
+        try:
+            mapfile_h = open(self.mapfile, 'r', newline='')
+        except Exception as e:
+            self.logger.error(e)
+            self.logger.error('Mapfile {} could not be loaded.'.format(self.mapfile))
+            return False
+
+        self.filemap = []
+        
+        with closing(mapfile_h):
+            try:
+                if self.mapfile.lower().endswith('.tsv'):
+                    csvreader = csv.DictReader(mapfile_h, dialect='excel-tab')
+                else:
+                    csvreader = csv.DictReader(mapfile_h, dialect='excel')
+            except Exception as e:
+                self.logger.error(e)
+                return False
+            
+            # csv validation
+            for column in csvreader.fieldnames:
+                if not column in ['file', 'URL', 'Content-Type', 'timestamp']:
+                    self.logger.error('Unknown column "{}" in mapfile.'.format(column))
+                    return False
+            if not 'file' in csvreader.fieldnames:
+                self.logger.error('Missing "file" column in mapfile.')
+                return False
+            if not len(csvreader.fieldnames) > 1:
+                self.logger.error('Mapfile needs one other column in addition to "file".')
+                return False
+
+            for row in csvreader:
+                self.filemap.append(row)
+
+            return True
+
+    def init_logfile(self):
+        try:
+            self.logfile_h = open(self.logfile, 'w', newline='')
+        except Exception as e:
+            self.logger.error(e)
+            self.logger.error('Logfile {} could not be opened for writing.'.format(self.logfile))
+            return False
+
+        self.logfile_writer = csv.DictWriter(self.logfile_h, fieldnames=['file', 'Record-Type', 
+                                                                         'URL', 'timestamp',
+                                                                         'Content-Type', 'mime', 
+                                                                         'charset'])
+        self.logfile_writer.writeheader()
+        
+        return True
+
+    def write_logfile(self, row):
+        if self.use_logfile:
+            self.logfile_writer.writerow(row)
+
+    def close_logfile(self):
+        if self.use_logfile:
+            self.logfile_h.close()
+
+    def _match_mapfile(self, filename):
+        for row in self.filemap:
+            if filename.endswith(row['file']):
+                if 'matched' in row:
+                    self.logger.error('Mapfile row for "{}" matched a second time on file "{}". Please ensure file names in your mapfile are unique.'.format(row['file'], filename))
+                    sys.exit(1)
+                
+                self.logger.debug('Matching row "{}" from mapfile.'.format(row['file']))
+                row['matched'] = True
+                return row
+        return None
+
+    def fnmatch_list(self, filename, fnmatch_list):
+        filename = filename.lower()
+        for pattern in fnmatch_list:
+            if fnmatch.fnmatch(filename, pattern):
+                return True
+        return False
+
+
     def load_magic(self):
         try:
             import magic
@@ -178,6 +341,17 @@ class WARCIT(object):
         except Exception as e:
             self.logger.error(e)
             self.logger.error('python-magic or libmagic is not available, please install or run without --use-magic flag')
+            return False
+
+    def load_tika(self):
+        try:
+            from tika import parser as tika_parser
+            self.tika_parser = tika_parser
+            self.tika_parser.from_buffer('Tika Test.')
+            return True
+        except Exception as e:
+            self.logger.error(e)
+            self.logger.error('Apache Tika not available, please set up or use another method for Content-Type or encoding detection.')
             return False
 
     def _make_name(self, name):
@@ -203,8 +377,17 @@ class WARCIT(object):
         return name
 
     def run(self):
-        if self.use_magic:
+        if self.use_magic == 'magic':
             if not self.load_magic():
+                return 1
+        if self.use_tika:
+            if not self.load_tika():
+                return 1
+        if self.use_mapfile:
+            if not self.load_mapfile():
+                return 1
+        if self.use_logfile:
+            if not self.init_logfile():
                 return 1
 
         try:
@@ -224,6 +407,9 @@ class WARCIT(object):
                 self.make_record(writer, file_info)
 
         self.logger.info('Wrote {0} resources to {1}'.format(self.count, self.name))
+
+        self.close_logfile()
+
         return 0
 
     def make_warcinfo(self, writer):
@@ -239,24 +425,54 @@ class WARCIT(object):
         writer.write_record(record)
 
     def make_record(self, writer, file_info):
-        if self.fixed_dt:
+        # process inclue/exclude rules
+        if self.include and self.exclude:
+            if self.fnmatch_list(file_info.full_filename, self.include):
+                pass
+            elif self.fnmatch_list(file_info.full_filename, self.exclude):
+                return False
+        elif self.include and not self.exclude:
+            if not self.fnmatch_list(file_info.full_filename, self.include):
+                return False
+        elif self.exclude and not self.include:
+            if self.fnmatch_list(file_info.full_filename, self.exclude):
+                return False
+
+        # type and encoding
+        if self.use_tika:
+            self.tika_results = self.tika_parser.from_file(file_info.full_filename)
+
+        if self.use_mapfile:
+            self.mapfile_results = self._match_mapfile(file_info.full_filename)
+
+        mime_type = self._guess_type(file_info)
+        encoding = self._guess_charset(mime_type, file_info)
+        warc_content_type = mime_type + encoding;
+
+        # target URL
+        if self.use_mapfile and self.mapfile_results and 'URL' in self.mapfile_results:
+                url = self.mapfile_results['URL']
+        else:
+            url = file_info.url
+
+        # timestamp
+        if self.use_mapfile and self.mapfile_results and 'timestamp' in self.mapfile_results:
+            warc_date = self._set_fixed_dt(self.mapfile_results['timestamp'])
+        elif self.fixed_dt:
             warc_date = self.fixed_dt
         else:
             warc_date = datetime_to_iso_date(file_info.modified_dt)
 
-        url = file_info.url
-
+        # source from local disk
         source_uri = 'file://' + file_info.full_filename
+
+        # write WARC entry
 
         warc_headers = {'WARC-Date': warc_date,
                         'WARC-Source-URI': source_uri,
                         'WARC-Created-Date': writer._make_warc_date()
                        }
 
-        warc_content_type = self._guess_type(file_info)
-
-        warc_content_type += self._guess_charset(warc_content_type,
-                                                 file_info)
 
         with file_info.open() as fh:
             record = writer.create_warc_record(url, 'resource',
@@ -271,6 +487,24 @@ class WARCIT(object):
             self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(url, warc_content_type, warc_date,
                                                                               file_info.full_filename))
 
+            
+        self.write_logfile({
+            'file': file_info.full_filename,
+            'Record-Type': 'Resource',
+            'URL': url,
+            'timestamp': warc_date,
+            'Content-Type': warc_content_type,
+            'mime': mime_type,
+            'charset': encoding[10:] # minus '; charset='
+            })
+
+
+        if self.use_tika:
+            del self.tika_results
+        if self.use_mapfile:
+            del self.mapfile_results
+
+        # Current file serves as a directory index
         if url.lower().endswith(self.index_files):
             self.add_index_revisit(writer, record, url, warc_date, source_uri)
 
@@ -288,39 +522,101 @@ class WARCIT(object):
         self.count += 1
         writer.write_record(revisit_record)
 
+        self.write_logfile({
+            'file': source_uri[7:], # shave off 'file://' in beginning
+            'Record-Type': 'Revisit',
+            'URL': index_url,
+            'timestamp': warc_date,
+            })
+
     def _guess_type(self, file_info):
+        if self.use_mapfile:
+            if self.mapfile_results:
+                if 'Content-Type' in self.mapfile_results:
+                    return self.mapfile_results['Content-Type'].split(';')[0]
+
         if self.mime_overrides:
             for pattern in self.mime_overrides:
                 if fnmatch.fnmatch(file_info.url, pattern):
                     return self.mime_overrides[pattern]
 
-        mime = mimetypes.guess_type(file_info.url.split('?', 1)[0], False)
-        if mime[0]:
-            return mime[0]
-
         mime = None
-        if self.magic:
+
+        if self.use_magic == 'filename':
+            mime = mimetypes.guess_type(file_info.url.split('?', 1)[0], False)
+            if len(mime) == 2:
+                mime = mime[0]
+        
+        elif self.use_magic == 'magic':
             with file_info.open() as fh:
                 mime = self.magic.from_buffer(fh.read(BUFF_SIZE))
+        
+        elif self.use_magic == 'tika':
+            # Tika might not return a Content-Type, a string, or a list.
+            # In case of a list, the first (most likely) value is chosen. 
+            try:
+                tika_content_type = self.tika_results['metadata']['Content-Type']
+                if isinstance(tika_content_type, list):
+                    tika_content_type = tika_content_type[0]
+                
+                mime = tika_content_type.split(';', 1)[0]
+            except:
+                mime = None
+
+        if self.no_xhtml and mime=='application/xhtml+xml':
+            mime = 'text/html'
 
         mime = mime or 'text/html'
 
         return mime
 
     def _guess_charset(self, content_type, file_info):
+        if self.use_mapfile:
+            if self.mapfile_results:
+                if 'Content-Type' in self.mapfile_results and ';' in self.mapfile_results['Content-Type']:
+                    return ';' + self.mapfile_results['Content-Type'].split(';')[1]
+
         charset = ''
         if not content_type.startswith('text/') or not self.charset:
             return ''
 
-        if self.charset == 'auto':
+        if self.charset == 'cchardet':
             with file_info.open() as fh:
                 result = cchardet.detect(fh.read())
 
             if result:
                 charset = result['encoding']
 
-            charset = charset.lower()
-            if charset == 'ascii':
+            # cchardet is detecting ascii on many basic English
+            # language resources, which usually
+            # means that no content type was specified. In that 
+            # case, do not return charset information completely,
+            # as the browser will have to figure it out.
+            if charset.lower() == 'ascii':
+                charset = ''
+
+        elif self.charset == 'tika':
+            # Tika might not return a Content-Encoding, a string, or a list.
+            # In case of a list, the first (most likely) value is chosen.
+            try:
+                tika_charset = self.tika_results['metadata']['Content-Encoding']
+                if isinstance(tika_charset, list):
+                    tika_charset = tika_charset[0]
+
+                # Tika assigns the charset "windows-1252" with Windows line breaks,
+                # or "ISO-8859-1" with Unix line breaks, if the file
+                # has an unspecified 8 bit encoding. Unless this
+                # encoding has been specified in the file, it should be
+                # removed. If there has been any "Content-Type-Hint" been
+                # found by Tika, it can be safely assumed that the detected
+                # charset is not a default assignment.
+                if tika_charset in ['windows-1252', 'ISO-8859-1']:
+                    if not 'Content-Type-Hint' in self.tika_results['metadata']:
+                        tika_charset = ''
+
+                charset = tika_charset
+            except Exception as e:
+                self.logger.debug(e)
                 charset = ''
 
         else:
@@ -381,8 +677,13 @@ class WARCIT(object):
 
 # ============================================================================
 class FileInfo(object):
+
     def __init__(self, url_prefix, path, filename):
-        self.url = url_prefix + path.replace(os.path.sep, '/').strip('./')
+        url = path.replace(os.path.sep, '/').strip('./')
+        for replace_char in '#;?:@&=+$, ': # see RFC 2396, plus '#' and ' '
+            url = url.replace(replace_char, '%%%x' % ord(replace_char))
+        self.url = url_prefix + url
+
         self.filename = filename
 
         self.full_filename = filename

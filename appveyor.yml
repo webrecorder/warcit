@@ -14,7 +14,7 @@ environment:
 
 install:        
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
-  - "pip install --disable-pip-version-check --user --upgrade pip"
+  - "python -m pip install --disable-pip-version-check --user --upgrade pip"
   - "pip install -U setuptools pytest"
   - "pip install coverage pytest-cov coveralls"
 
