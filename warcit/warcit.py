@@ -8,22 +8,18 @@ import logging
 import zipfile
 import fnmatch
 import csv
+import errno
 
 from warcio.warcwriter import WARCWriter
 from warcio.timeutils import datetime_to_iso_date, timestamp_to_iso_date
 from warcio.timeutils import pad_timestamp, PAD_14_DOWN, DATE_TIMESPLIT
+import warcio.utils
 from contextlib import closing
 from collections import OrderedDict
 import cchardet
 
 
 BUFF_SIZE = 2048
-
-# ============================================================================
-if sys.version_info < (3, 3):  #pragma: no cover
-    xb_supported = False
-else:  #pragma: no cover
-    xb_supported = True
 
 
 # ============================================================================
@@ -397,14 +393,9 @@ class WARCIT(object):
                 return 1
 
         try:
-            if self.mode == 'xb' and not xb_supported:  #pragma: no cover
-                fd = os.open(self.name, os.O_EXCL | os.O_CREAT | os.O_WRONLY)
-                output = os.fdopen(fd, 'w', 0x664)
-            else:
-                output = open(self.name, self.mode)
+            output = warcio.utils.open(self.name, self.mode)
         except OSError as e:
             # ensure only file exists handling
-            import errno
             if e.errno != errno.EEXIST:
                 raise
 
