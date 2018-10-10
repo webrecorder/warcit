@@ -8,10 +8,12 @@ import logging
 import zipfile
 import fnmatch
 import csv
+import errno
 
 from warcio.warcwriter import WARCWriter
 from warcio.timeutils import datetime_to_iso_date, timestamp_to_iso_date
 from warcio.timeutils import pad_timestamp, PAD_14_DOWN, DATE_TIMESPLIT
+import warcio.utils
 from contextlib import closing
 from collections import OrderedDict
 import cchardet
@@ -22,8 +24,8 @@ BUFF_SIZE = 2048
 
 # ============================================================================
 def main(args=None):
-    if sys.version_info < (3, 4):  #pragma: no cover
-        print('Sorry, warcit requires python >= 3.4, you are running {0}'.format(sys.version.split(' ')[0]))
+    if sys.version_info < (2, 7):  #pragma: no cover
+        print('Sorry, warcit requires python >= 2.7, you are running {0}'.format(sys.version.split(' ')[0]))
         return 1
 
     parser = ArgumentParser(description='Convert Directories and Files to Web Archive (WARC)')
@@ -49,7 +51,7 @@ def main(args=None):
 
     parser.add_argument('-a', '--append', action='store_true')
     parser.add_argument('-o', '--overwrite', action='store_true')
-   
+
 
     parser.add_argument('--use-magic', '--magic',
                         help='''Select method for MIME type guessing:
@@ -86,7 +88,7 @@ def main(args=None):
                         help='''Do not include technical information about the resulting
                                 WARC file's creation.''',
                         action='store_true')
-    
+
     parser.add_argument('--no-gzip',
                         help='''Do not compress WARC file.''',
                         action='store_true')
@@ -261,7 +263,7 @@ class WARCIT(object):
             return False
 
         self.filemap = []
-        
+
         with closing(mapfile_h):
             try:
                 if self.mapfile.lower().endswith('.tsv'):
@@ -271,7 +273,7 @@ class WARCIT(object):
             except Exception as e:
                 self.logger.error(e)
                 return False
-            
+
             # csv validation
             for column in csvreader.fieldnames:
                 if not column in ['file', 'URL', 'Content-Type', 'timestamp']:
@@ -302,7 +304,7 @@ class WARCIT(object):
                                                                          'Content-Type', 'mime', 
                                                                          'charset'])
         self.logfile_writer.writeheader()
-        
+
         return True
 
     def write_logfile(self, row):
@@ -319,7 +321,7 @@ class WARCIT(object):
                 if 'matched' in row:
                     self.logger.error('Mapfile row for "{}" matched a second time on file "{}". Please ensure file names in your mapfile are unique.'.format(row['file'], filename))
                     sys.exit(1)
-                
+
                 self.logger.debug('Matching row "{}" from mapfile.'.format(row['file']))
                 row['matched'] = True
                 return row
@@ -391,8 +393,12 @@ class WARCIT(object):
                 return 1
 
         try:
-            output = open(self.name, self.mode)
-        except FileExistsError as e:
+            output = warcio.utils.open(self.name, self.mode)
+        except OSError as e:
+            # ensure only file exists handling
+            if e.errno != errno.EEXIST:
+                raise
+
             self.logger.error(e)
             self.logger.error('* Use -a/--append to append to an existing WARC file')
             self.logger.error('* Use -o/--overwrite to overwrite existing WARC file')
@@ -470,7 +476,7 @@ class WARCIT(object):
 
         warc_headers = {'WARC-Date': warc_date,
                         'WARC-Source-URI': source_uri,
-                        'WARC-Created-Date': writer._make_warc_date()
+                        'WARC-Creation-Date': writer._make_warc_date()
                        }
 
 
@@ -487,7 +493,7 @@ class WARCIT(object):
             self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(url, warc_content_type, warc_date,
                                                                               file_info.full_filename))
 
-            
+
         self.write_logfile({
             'file': file_info.full_filename,
             'Record-Type': 'Resource',
@@ -515,7 +521,7 @@ class WARCIT(object):
 
         revisit_record = writer.create_revisit_record(index_url, digest, url, warc_date)
 
-        revisit_record.rec_headers.replace_header('WARC-Created-Date', revisit_record.rec_headers.get_header('WARC-Date'))
+        revisit_record.rec_headers.replace_header('WARC-Creation-Date', revisit_record.rec_headers.get_header('WARC-Date'))
         revisit_record.rec_headers.replace_header('WARC-Date', warc_date)
         revisit_record.rec_headers.replace_header('WARC-Source-URI', source_uri)
 
@@ -546,11 +552,11 @@ class WARCIT(object):
             mime = mimetypes.guess_type(file_info.url.split('?', 1)[0], False)
             if len(mime) == 2:
                 mime = mime[0]
-        
+
         elif self.use_magic == 'magic':
             with file_info.open() as fh:
                 mime = self.magic.from_buffer(fh.read(BUFF_SIZE))
-        
+
         elif self.use_magic == 'tika':
             # Tika might not return a Content-Type, a string, or a list.
             # In case of a list, the first (most likely) value is chosen. 
@@ -558,7 +564,7 @@ class WARCIT(object):
                 tika_content_type = self.tika_results['metadata']['Content-Type']
                 if isinstance(tika_content_type, list):
                     tika_content_type = tika_content_type[0]
-                
+
                 mime = tika_content_type.split(';', 1)[0]
             except:
                 mime = None
