@@ -33,7 +33,7 @@ setup(
         'warcit',
         ],
     install_requires=[
-        'warcio>=1.6.0',
+        'warcio>=1.6.1',
         'cchardet'
         ],
     zip_safe=True,
