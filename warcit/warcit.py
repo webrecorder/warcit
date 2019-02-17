@@ -5,7 +5,6 @@ import sys
 import datetime
 import mimetypes
 import logging
-import zipfile
 import fnmatch
 import csv
 import errno
@@ -18,6 +17,8 @@ from contextlib import closing
 from collections import OrderedDict
 import cchardet
 
+from warcit.base import BaseTool, get_version, init_logging
+
 
 BUFF_SIZE = 2048
 
@@ -28,7 +29,7 @@ def main(args=None):
         print('Sorry, warcit requires python >= 2.7, you are running {0}'.format(sys.version.split(' ')[0]))
         return 1
 
-    parser = ArgumentParser(description='Convert Directories and Files to Web Archive (WARC)')
+    parser = ArgumentParser(description='Create WARC files from content in directories, files and zip files')
 
     parser.add_argument('-V', '--version', action='version', version=get_version())
 
@@ -138,13 +139,7 @@ def main(args=None):
     else:
         mode = 'xb'
 
-    logging.basicConfig(format='[%(levelname)s] %(message)s')
-    if r.verbose:
-        loglevel = logging.DEBUG
-    elif r.quiet:
-        loglevel = logging.ERROR
-    else:
-        loglevel = logging.INFO
+    init_logging(r)
 
     return WARCIT(r.url_prefix,
                   r.inputs,
@@ -154,7 +149,6 @@ def main(args=None):
                   use_magic=r.use_magic,
                   warcinfo=not r.no_warcinfo,
                   charset=r.charset,
-                  loglevel=loglevel,
                   mode=mode,
                   index_files=r.index_files,
                   mime_overrides=r.mime_overrides,
@@ -168,7 +162,7 @@ def main(args=None):
 
 
 # ============================================================================
-class WARCIT(object):
+class WARCIT(BaseTool):
     def __init__(self, url_prefix, inputs,
                  name=None,
                  fixed_dt=None,
@@ -176,7 +170,6 @@ class WARCIT(object):
                  use_magic=False,
                  warcinfo=True,
                  charset=None,
-                 loglevel=None,
                  mode='xb',
                  index_files=None,
                  mime_overrides=None,
@@ -187,12 +180,11 @@ class WARCIT(object):
                  logfile=None,
                  args=None):
 
-        self.logger = logging.getLogger('WARCIT')
-        if loglevel:
-            self.logger.setLevel(loglevel)
+        super(WARCIT, self).__init__(
+            url_prefix=url_prefix,
+            inputs=inputs,
+        )
 
-        self.url_prefix = url_prefix
-        self.inputs = inputs
         self.gzip = gzip
         self.count = 0
         self.mode = mode
@@ -299,9 +291,9 @@ class WARCIT(object):
             self.logger.error('Logfile {} could not be opened for writing.'.format(self.logfile))
             return False
 
-        self.logfile_writer = csv.DictWriter(self.logfile_h, fieldnames=['file', 'Record-Type', 
+        self.logfile_writer = csv.DictWriter(self.logfile_h, fieldnames=['file', 'Record-Type',
                                                                          'URL', 'timestamp',
-                                                                         'Content-Type', 'mime', 
+                                                                         'Content-Type', 'mime',
                                                                          'charset'])
         self.logfile_writer.writeheader()
 
@@ -632,101 +624,6 @@ class WARCIT(object):
             return '; charset=' + charset
         else:
             return ''
-
-    def iter_inputs(self):
-        for input_ in self.inputs:
-            if os.path.isdir(input_):
-                for root, dirs, files in os.walk(input_):
-                    for name in files:
-                        filename = os.path.join(root, name)
-                        path = os.path.relpath(filename, input_)
-                        yield FileInfo(self.url_prefix, path, filename)
-
-            else:
-                is_zip, filename, zip_prefix = self.parse_filename(input_)
-
-                if not is_zip:
-                    if filename and not zip_prefix:
-                        yield FileInfo(self.url_prefix, os.path.basename(input_), input_)
-                    else:
-                        self.logger.error('"{0}" not a valid file or directory'.format(input_))
-
-                else:
-                    with zipfile.ZipFile(filename) as zp:
-                        for zinfo in zp.infolist():
-                            if zinfo.filename.endswith('/'):
-                                continue
-
-                            if zip_prefix and not zinfo.filename.startswith(zip_prefix):
-                                continue
-
-                            yield ZipFileInfo(self.url_prefix, zp, zinfo, zip_prefix)
-
-    def parse_filename(self, filename):
-        zip_path = []
-        while filename:
-            if os.path.isfile(filename):
-                if zipfile.is_zipfile(filename):
-                    return True, filename, '/'.join(zip_path)
-                else:
-                    return False, filename, ''
-
-            elif os.path.isdir(filename):
-                return False, '', ''
-
-            else:
-                zip_path.insert(0, os.path.basename(filename))
-                filename = os.path.dirname(filename)
-
-        return False, '', ''
-
-
-# ============================================================================
-class FileInfo(object):
-
-    def __init__(self, url_prefix, path, filename):
-        url = path.replace(os.path.sep, '/').strip('./')
-        for replace_char in '#;?:@&=+$, ': # see RFC 2396, plus '#' and ' '
-            url = url.replace(replace_char, '%%%x' % ord(replace_char))
-        self.url = url_prefix + url
-
-        self.filename = filename
-
-        self.full_filename = filename
-
-        stats = os.stat(filename)
-        self.modified_dt = datetime.datetime.utcfromtimestamp(stats.st_mtime)
-        self.size = stats.st_size
-
-    def open(self):
-        return open(self.filename, 'rb')
-
-
-# ============================================================================
-class ZipFileInfo(object):
-    def __init__(self, url_prefix, zp, zinfo, prefix):
-        filename = zinfo.filename
-        if prefix and filename.startswith(prefix):
-            filename = filename[len(prefix):]
-
-        self.full_filename = zp.filename + '/' + zinfo.filename
-
-        self.url = url_prefix + filename.strip('./')
-        self.filename = zinfo.filename
-        self.zp = zp
-
-        self.modified_dt = datetime.datetime(*zinfo.date_time)
-        self.size = zinfo.file_size
-
-    def open(self):
-        return self.zp.open(self.filename, 'r')
-
-
-
-# ============================================================================
-def get_version():
-    import pkg_resources
-    return '%(prog)s ' + pkg_resources.get_distribution('warcit').version
 
 
 # ============================================================================
