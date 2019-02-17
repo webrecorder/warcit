@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
 import glob
 
-__version__ = '0.3.1'
+__version__ = '0.4.0'
 
 
 class PyTest(TestCommand):
@@ -34,12 +34,14 @@ setup(
         ],
     install_requires=[
         'warcio>=1.6.1',
-        'cchardet'
+        'cchardet',
+        'pyyaml',
         ],
     zip_safe=True,
     entry_points="""
         [console_scripts]
         warcit = warcit.warcit:main
+        warcit-converter = warcit.converter:main
     """,
     cmdclass={'test': PyTest},
     test_suite='',

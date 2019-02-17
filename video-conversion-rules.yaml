@@ -1,0 +1,23 @@
+output_dir: ./output_dir
+
+url_prefix: http://
+
+#convert_logfile: ./output_dir/.convert.log
+
+file_types:
+  - rx: '.*\.flv$'
+    conversions:
+      - name: lossless
+        ext: mkv
+        command: 'ffmpeg -y -i {input} -c:v ffv1 -c:a flac {output}'
+
+      - name: webm_vp9
+        ext: webm
+        command: 'ffmpeg -y -i {input} -c:v vp9 -c:a libopus {output}'
+        #skip: true
+
+      - name: mp4_default
+        ext: mp4
+        command: 'ffmpeg -y -i {input} {output}'
+        #skip: true
+
