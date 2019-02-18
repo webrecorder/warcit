@@ -38,14 +38,14 @@ class BaseTool(object):
                     for name in files:
                         filename = os.path.join(root, name)
                         path = os.path.relpath(filename, input_)
-                        yield FileInfo(self.url_prefix, path, filename)
+                        yield PrefixedFileInfo(self.url_prefix, path, filename)
 
             else:
                 is_zip, filename, zip_prefix = self.parse_filename(input_)
 
                 if not is_zip:
                     if filename and not zip_prefix:
-                        yield FileInfo(self.url_prefix, os.path.basename(input_), input_)
+                        yield PrefixedFileInfo(self.url_prefix, os.path.basename(input_), input_)
                     else:
                         self.logger.error('"{0}" not a valid file or directory'.format(input_))
 
@@ -81,41 +81,57 @@ class BaseTool(object):
 
 # ============================================================================
 class FileInfo(object):
-    def __init__(self, url_prefix, path, filename):
-        url = path.replace(os.path.sep, '/').strip('./')
-        for replace_char in '#;?:@&=+$, ': # see RFC 2396, plus '#' and ' '
-            url = url.replace(replace_char, '%%%x' % ord(replace_char))
-        self.url = url_prefix + url
-
-        self.filename = filename
-
+    def __init__(self, url, filename):
+        self.url = url
         self.full_filename = filename
 
-        stats = os.stat(filename)
+        self.mapfile_results = None
+        self.tika_results = None
+
+        self._init_stats()
+
+    def _init_stats(self):
+        stats = os.stat(self.full_filename)
         self.modified_dt = datetime.datetime.utcfromtimestamp(stats.st_mtime)
         self.size = stats.st_size
 
     def open(self):
-        return open(self.filename, 'rb')
+        return open(self.full_filename, 'rb')
 
 
 # ============================================================================
-class ZipFileInfo(object):
+class PrefixedFileInfo(FileInfo):
+    def __init__(self, url_prefix, path, filename):
+        url = path.replace(os.path.sep, '/').strip('./')
+        for replace_char in '#;?:@&=+$, ': # see RFC 2396, plus '#' and ' '
+            url = url.replace(replace_char, '%%%x' % ord(replace_char))
+        url = url_prefix + url
+
+        super(PrefixedFileInfo, self).__init__(url, filename)
+
+
+# ============================================================================
+class ZipFileInfo(FileInfo):
     def __init__(self, url_prefix, zp, zinfo, prefix):
-        filename = zinfo.filename
+        self.zp = zp
+        self.zinfo = zinfo
+        self.internal_filename = zinfo.filename
+
+        filename = self.internal_filename
         if prefix and filename.startswith(prefix):
             filename = filename[len(prefix):]
 
-        self.full_filename = zp.filename + '/' + zinfo.filename
+        url = url_prefix + filename.strip('./')
 
-        self.url = url_prefix + filename.strip('./')
-        self.filename = zinfo.filename
-        self.zp = zp
+        full_filename = zp.filename + '/' + self.internal_filename
 
-        self.modified_dt = datetime.datetime(*zinfo.date_time)
-        self.size = zinfo.file_size
+        super(ZipFileInfo, self).__init__(url, full_filename)
+
+    def _init_stats(self):
+        self.modified_dt = datetime.datetime(*self.zinfo.date_time)
+        self.size = self.zinfo.file_size
 
     def open(self):
-        return self.zp.open(self.filename, 'r')
+        return self.zp.open(self.internal_filename, 'r')
 
 
