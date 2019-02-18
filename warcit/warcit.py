@@ -8,6 +8,9 @@ import logging
 import fnmatch
 import csv
 import errno
+import json
+
+from io import BytesIO
 
 from warcio.warcwriter import WARCWriter
 from warcio.timeutils import datetime_to_iso_date, timestamp_to_iso_date
@@ -18,6 +21,7 @@ from collections import OrderedDict
 import cchardet
 
 from warcit.base import BaseTool, get_version, init_logging
+from warcit.converter import ConversionSerializer, TransclusionSerializer
 
 
 BUFF_SIZE = 2048
@@ -95,8 +99,8 @@ def main(args=None):
                         action='store_true')
 
     parser.add_argument('-c', '--charset',
-                        help='''Set charset for text/* MIME types. 
-                                Use "cchardet" for guessing via cchardet, 
+                        help='''Set charset for text/* MIME types.
+                                Use "cchardet" for guessing via cchardet,
                                 "tika" for guessing via Apache Tika,
                                 "none" (default) for not adding charset information.''',
                         metavar='{<ENCODING>, cchardet, tika, none}')
@@ -129,6 +133,9 @@ def main(args=None):
                         help='''Write a log file in CSV format.''',
                         metavar='<FILENAME>')
 
+    parser.add_argument('--conversions')
+
+    parser.add_argument('--transclusions')
 
     r = parser.parse_args(args=args)
 
@@ -158,6 +165,8 @@ def main(args=None):
                   exclude=r.exclude,
                   logfile=r.log,
                   args=args,
+                  conversions=r.conversions,
+                  transclusions=r.transclusions,
                  ).run()
 
 
@@ -178,6 +187,8 @@ class WARCIT(BaseTool):
                  include=False,
                  exclude=False,
                  logfile=None,
+                 conversions=None,
+                 transclusions=None,
                  args=None):
 
         super(WARCIT, self).__init__(
@@ -232,6 +243,16 @@ class WARCIT(BaseTool):
         self.use_logfile = False
         if self.logfile:
             self.use_logfile = True
+
+        if conversions:
+            self.conversion_serializer = ConversionSerializer(conversions)
+        else:
+            self.conversion_serializer = None
+
+        if transclusions:
+            self.transclusion_serializer = TransclusionSerializer(transclusions, conversions)
+        else:
+            self.transclusion_serializer = None
 
     def _init_mimes(self):
         # add any custom, fixed mime types here
@@ -402,7 +423,17 @@ class WARCIT(BaseTool):
             self.make_warcinfo(writer)
 
             for file_info in self.iter_inputs():
-                self.make_record(writer, file_info)
+                url, record = self.make_record(writer, file_info)
+
+                # Current file serves as a directory index
+                if url.lower().endswith(self.index_files):
+                    self.make_index_revisit(writer, url, record)
+
+                if self.conversion_serializer:
+                    self.make_conversions(writer, url, record)
+
+                if self.transclusion_serializer:
+                    self.make_transclusion_metadata(writer, url, record)
 
         self.logger.info('Wrote {0} resources to {1}'.format(self.count, self.name))
 
@@ -422,7 +453,9 @@ class WARCIT(BaseTool):
         record = writer.create_warcinfo_record(self.name, params)
         writer.write_record(record)
 
-    def make_record(self, writer, file_info):
+        return record
+
+    def make_record(self, writer, file_info, record_type='resource', extra_headers=None):
         # process inclue/exclude rules
         if self.include and self.exclude:
             if self.fnmatch_list(file_info.full_filename, self.include):
@@ -438,24 +471,24 @@ class WARCIT(BaseTool):
 
         # type and encoding
         if self.use_tika:
-            self.tika_results = self.tika_parser.from_file(file_info.full_filename)
+            file_info.tika_results = self.tika_parser.from_file(file_info.full_filename)
 
         if self.use_mapfile:
-            self.mapfile_results = self._match_mapfile(file_info.full_filename)
+            file_info.mapfile_results = self._match_mapfile(file_info.full_filename)
 
         mime_type = self._guess_type(file_info)
         encoding = self._guess_charset(mime_type, file_info)
         warc_content_type = mime_type + encoding;
 
         # target URL
-        if self.use_mapfile and self.mapfile_results and 'URL' in self.mapfile_results:
-                url = self.mapfile_results['URL']
+        if self.use_mapfile and file_info.mapfile_results and 'URL' in file_info.mapfile_results:
+                url = file_info.mapfile_results['URL']
         else:
             url = file_info.url
 
         # timestamp
-        if self.use_mapfile and self.mapfile_results and 'timestamp' in self.mapfile_results:
-            warc_date = self._set_fixed_dt(self.mapfile_results['timestamp'])
+        if self.use_mapfile and file_info.mapfile_results and 'timestamp' in file_info.mapfile_results:
+            warc_date = self._set_fixed_dt(file_info.mapfile_results['timestamp'])
         elif self.fixed_dt:
             warc_date = self.fixed_dt
         else:
@@ -471,9 +504,12 @@ class WARCIT(BaseTool):
                         'WARC-Creation-Date': writer._make_warc_date()
                        }
 
+        if extra_headers:
+            warc_headers.update(extra_headers)
+
 
         with file_info.open() as fh:
-            record = writer.create_warc_record(url, 'resource',
+            record = writer.create_warc_record(url, record_type,
                                       payload=fh,
                                       length=file_info.size,
                                       warc_content_type=warc_content_type,
@@ -488,7 +524,7 @@ class WARCIT(BaseTool):
 
         self.write_logfile({
             'file': file_info.full_filename,
-            'Record-Type': 'Resource',
+            'Record-Type': record_type,
             'URL': url,
             'timestamp': warc_date,
             'Content-Type': warc_content_type,
@@ -496,42 +532,88 @@ class WARCIT(BaseTool):
             'charset': encoding[10:] # minus '; charset='
             })
 
+        return url, record
 
-        if self.use_tika:
-            del self.tika_results
-        if self.use_mapfile:
-            del self.mapfile_results
-
-        # Current file serves as a directory index
-        if url.lower().endswith(self.index_files):
-            self.add_index_revisit(writer, record, url, warc_date, source_uri)
-
-    def add_index_revisit(self, writer, record, url, warc_date, source_uri):
+    def make_index_revisit(self, writer, url, record):
         index_url = url.rsplit('/', 1)[0] + '/'
         digest = record.rec_headers.get('WARC-Payload-Digest')
         self.logger.debug('Adding auto-index: {0} -> {1}'.format(index_url, url))
 
+        warc_date = record.rec_headers['WARC-Date']
+        source_uri = record.rec_headers['WARC-Source-URI']
+
         revisit_record = writer.create_revisit_record(index_url, digest, url, warc_date)
 
-        revisit_record.rec_headers.replace_header('WARC-Creation-Date', revisit_record.rec_headers.get_header('WARC-Date'))
-        revisit_record.rec_headers.replace_header('WARC-Date', warc_date)
-        revisit_record.rec_headers.replace_header('WARC-Source-URI', source_uri)
+        # no creation date needed, as it matches warc-date
+        #revisit_record.rec_headers['WARC-Creation-Date'] = warc_date
+        revisit_record.rec_headers['WARC-Source-URI'] = source_uri
 
         self.count += 1
         writer.write_record(revisit_record)
 
         self.write_logfile({
             'file': source_uri[7:], # shave off 'file://' in beginning
-            'Record-Type': 'Revisit',
+            'Record-Type': 'revisit',
             'URL': index_url,
             'timestamp': warc_date,
             })
 
+    def make_conversions(self, writer, url, record):
+        for file_info, type_, metadata in self.conversion_serializer.find_conversions(url):
+            extra_headers = {'WARC-Refers-To': record.rec_headers['WARC-Record-ID'],
+                             'WARC-Refers-To-Target-URI': record.rec_headers['WARC-Target-URI'],
+                             'WARC-Refers-To-Target-Date': record.rec_headers['WARC-Date']
+                            }
+
+            if metadata:
+                extra_headers['WARC-JSON-Metadata'] = json.dumps(metadata)
+
+            self.make_record(writer, file_info, type_, extra_headers)
+
+    def make_transclusion_metadata(self, writer, url, record):
+        content_type = record.rec_headers.get('Content-Type')
+        for url, timestamp, metadata in self.transclusion_serializer.find_transclusions(url, content_type):
+            if url.startswith('http://'):
+                url = url.replace('http://', 'metadata://')
+            elif url.startswith('https://'):
+                url = url.replace('https://', 'metadata://')
+
+            content = json.dumps(metadata, indent=2, sort_keys=True).encode('utf-8')
+
+            warc_date = timestamp_to_iso_date(timestamp)
+
+            warc_headers = {
+                            'WARC-Date': warc_date,
+                            'WARC-Creation-Date': writer._make_warc_date()
+                           }
+
+            warc_content_type = 'application/vnd.youtube-dl_formats+json'
+
+            record = writer.create_warc_record(url, 'metadata',
+                                      payload=BytesIO(content),
+                                      length=len(content),
+                                      warc_content_type=warc_content_type,
+                                      warc_headers_dict=warc_headers)
+
+            logging.debug('Writing transclusion metadata at {0}'.format(url))
+
+            writer.write_record(record)
+            self.count += 1
+
+            self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(url, warc_content_type, warc_date, '-'))
+
+            self.write_logfile({
+                'file': '-',
+                'Record-Type': 'metadata',
+                'URL': url,
+                'timestamp': warc_date,
+                })
+
     def _guess_type(self, file_info):
         if self.use_mapfile:
-            if self.mapfile_results:
-                if 'Content-Type' in self.mapfile_results:
-                    return self.mapfile_results['Content-Type'].split(';')[0]
+            if file_info.mapfile_results:
+                if 'Content-Type' in file_info.mapfile_results:
+                    return file_info.mapfile_results['Content-Type'].split(';')[0]
 
         if self.mime_overrides:
             for pattern in self.mime_overrides:
@@ -551,9 +633,9 @@ class WARCIT(BaseTool):
 
         elif self.use_magic == 'tika':
             # Tika might not return a Content-Type, a string, or a list.
-            # In case of a list, the first (most likely) value is chosen. 
+            # In case of a list, the first (most likely) value is chosen.
             try:
-                tika_content_type = self.tika_results['metadata']['Content-Type']
+                tika_content_type = file_info.tika_results['metadata']['Content-Type']
                 if isinstance(tika_content_type, list):
                     tika_content_type = tika_content_type[0]
 
@@ -570,9 +652,9 @@ class WARCIT(BaseTool):
 
     def _guess_charset(self, content_type, file_info):
         if self.use_mapfile:
-            if self.mapfile_results:
-                if 'Content-Type' in self.mapfile_results and ';' in self.mapfile_results['Content-Type']:
-                    return ';' + self.mapfile_results['Content-Type'].split(';')[1]
+            if file_info.mapfile_results:
+                if 'Content-Type' in file_info.mapfile_results and ';' in file_info.mapfile_results['Content-Type']:
+                    return ';' + file_info.mapfile_results['Content-Type'].split(';')[1]
 
         charset = ''
         if not content_type.startswith('text/') or not self.charset:
@@ -587,7 +669,7 @@ class WARCIT(BaseTool):
 
             # cchardet is detecting ascii on many basic English
             # language resources, which usually
-            # means that no content type was specified. In that 
+            # means that no content type was specified. In that
             # case, do not return charset information completely,
             # as the browser will have to figure it out.
             if charset.lower() == 'ascii':
@@ -597,7 +679,7 @@ class WARCIT(BaseTool):
             # Tika might not return a Content-Encoding, a string, or a list.
             # In case of a list, the first (most likely) value is chosen.
             try:
-                tika_charset = self.tika_results['metadata']['Content-Encoding']
+                tika_charset = file_info.tika_results['metadata']['Content-Encoding']
                 if isinstance(tika_charset, list):
                     tika_charset = tika_charset[0]
 
@@ -609,7 +691,7 @@ class WARCIT(BaseTool):
                 # found by Tika, it can be safely assumed that the detected
                 # charset is not a default assignment.
                 if tika_charset in ['windows-1252', 'ISO-8859-1']:
-                    if not 'Content-Type-Hint' in self.tika_results['metadata']:
+                    if not 'Content-Type-Hint' in file_info.tika_results['metadata']:
                         tika_charset = ''
 
                 charset = tika_charset

@@ -49,7 +49,7 @@ class TestWarcIt(object):
         res = main(['-a', 'http://www.iana.org/', '-q', self.test_dir])
         assert res == 0
 
-    def test_warcit_diff_file(self, caplog, capsys):
+    def test_warcit_with_index_revisit(self, caplog, capsys):
         res = main(['-v', '--name', 'test', '--no-gzip', 'http://www.iana.org/', self.test_dir])
         assert res == 0
 
