@@ -181,3 +181,23 @@ class TestWarcIt(object):
         assert "python-magic or libmagic is not available" in caplog.text
 
         del sys.modules['magic']
+
+    def test_transclusions(self, capsys):
+        transclusions = """
+transclusions:
+  http://www.iana.org/_img/bookmark_icon.ico:
+    - url: http://www.example.com/containing/page.html
+      timestamp: 20190102030000
+"""
+
+        transclusions_file = os.path.join(self.root_dir, 'transclusions.yaml')
+        with open(transclusions_file, 'wt') as fh:
+            fh.write(transclusions)
+
+        res = main(['-o', '-v', '-n', 'test-transc.warc', '--transclusions', transclusions_file, 'http://www.iana.org/', self.test_dir])
+
+        warcio_main(['index', '-f', 'warc-type,warc-target-uri,warc-date', 'test-transc.warc.gz'])
+
+        out, err = capsys.readouterr()
+
+        assert '"warc-type": "metadata", "warc-target-uri": "metadata://www.example.com/containing/page.html, "warc-date": "2019-01-02T03:00:00Z"' not in out

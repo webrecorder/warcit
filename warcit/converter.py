@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import yaml
 import logging
 import re
