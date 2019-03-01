@@ -38,6 +38,9 @@ setup(
         'pyyaml',
         ],
     zip_safe=True,
+    package_data={
+        'warcit': '*.yaml'
+        },
     entry_points="""
         [console_scripts]
         warcit = warcit.warcit:main

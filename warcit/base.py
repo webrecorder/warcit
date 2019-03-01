@@ -38,7 +38,7 @@ class BaseTool(object):
                     for name in files:
                         filename = os.path.join(root, name)
                         path = os.path.relpath(filename, input_)
-                        yield PrefixedFileInfo(self.url_prefix, path, filename)
+                        yield PrefixedFileInfo(self.url_prefix, path, filename, os.path.dirname(input_))
 
             else:
                 is_zip, filename, zip_prefix = self.parse_filename(input_)
@@ -81,9 +81,10 @@ class BaseTool(object):
 
 # ============================================================================
 class FileInfo(object):
-    def __init__(self, url, filename):
+    def __init__(self, url, filename, root_dir=None):
         self.url = url
         self.full_filename = filename
+        self.root_dir = root_dir or ''
 
         self.mapfile_results = None
         self.tika_results = None
@@ -101,13 +102,13 @@ class FileInfo(object):
 
 # ============================================================================
 class PrefixedFileInfo(FileInfo):
-    def __init__(self, url_prefix, path, filename):
+    def __init__(self, url_prefix, path, filename, root_dir=''):
         url = path.replace(os.path.sep, '/').strip('./')
         for replace_char in '#;?:@&=+$, ': # see RFC 2396, plus '#' and ' '
             url = url.replace(replace_char, '%%%x' % ord(replace_char))
         url = url_prefix + url
 
-        super(PrefixedFileInfo, self).__init__(url, filename)
+        super(PrefixedFileInfo, self).__init__(url, filename, root_dir)
 
 
 # ============================================================================

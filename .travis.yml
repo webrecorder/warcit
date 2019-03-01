@@ -5,11 +5,18 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
+  - "3.7"
 
 os:
   - linux
 
 sudo: false
+
+matrix:
+  include:
+    - python: "3.7"
+      dist: xenial
+      sudo: required
 
 install:
   - python setup.py install

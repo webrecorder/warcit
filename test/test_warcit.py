@@ -4,9 +4,11 @@ import os
 import sys
 import zipfile
 import pytest
+import yaml
 
 from io import BytesIO
 from warcit.warcit import main
+from warcit.converter import main as converter_main
 from warcio.cli import main as warcio_main
 
 
@@ -18,9 +20,9 @@ class TestWarcIt(object):
         cls.orig_cwd = os.getcwd()
         os.chdir(cls.root_dir)
 
-        root = os.path.dirname(os.path.realpath(__file__))
+        cls.test_root = os.path.dirname(os.path.realpath(__file__))
 
-        cls.zip_filename = os.path.join(root, 'www.iana.org.zip')
+        cls.zip_filename = os.path.join(cls.test_root, 'www.iana.org.zip')
 
         with zipfile.ZipFile(cls.zip_filename) as zp:
             zp.extractall()
@@ -201,3 +203,59 @@ transclusions:
         out, err = capsys.readouterr()
 
         assert '"warc-type": "metadata", "warc-target-uri": "metadata://www.example.com/containing/page.html, "warc-date": "2019-01-02T03:00:00Z"' not in out
+
+    def test_conversions(self, caplog):
+        convert_source_dir = os.path.join(self.test_root, 'convert-test')
+
+        res = converter_main(['-v', 'http://www.example.com/', convert_source_dir])
+
+        convert_output_dir = os.path.join(self.root_dir, 'conversions')
+
+        assert 'Converting: http://www.example.com/videos/barsandtone.flv' in caplog.text
+
+        assert os.path.isfile(os.path.join(convert_output_dir, 'convert-test', 'videos', 'barsandtone.flv.mp4'))
+        assert os.path.isfile(os.path.join(convert_output_dir, 'convert-test', 'videos', 'barsandtone.flv.webm'))
+        assert os.path.isfile(os.path.join(convert_output_dir, 'convert-test', 'videos', 'barsandtone.flv.mkv'))
+
+        TestWarcIt.conversion_results = os.path.join(convert_output_dir, 'warcit-conversion-results.yaml')
+
+        assert os.path.isfile(self.conversion_results)
+
+        with open(self.conversion_results) as fh:
+            results = yaml.load(fh.read())
+
+        assert len(results['conversions']['http://www.example.com/videos/barsandtone.flv']) == 3
+        assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][0]['url'] == 'http://www.example.com/videos/barsandtone.flv.webm'
+        assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][1]['url'] == 'http://www.example.com/videos/barsandtone.flv.mp4'
+        assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][2]['url'] == 'http://www.example.com/videos/barsandtone.flv.mkv'
+
+    def test_transclude_converted(self, capsys):
+        transclusions = """
+transclusions:
+  http://www.example.com/videos/barsandtone.flv:
+    - url: http://www.example.com/containing/page.html
+      timestamp: 20190103020000
+"""
+
+        transclusions_file = os.path.join(self.root_dir, 'transclu2.yaml')
+        with open(transclusions_file, 'wt') as fh:
+            fh.write(transclusions)
+
+        source_dir = os.path.join(self.test_root, 'convert-test')
+
+        res = main(['-o', '-v', '-n', 'test-transc2.warc', '--transclusions', transclusions_file,
+                    '--conversions', self.conversion_results, 'http://www.example.com/', source_dir])
+
+        warcio_main(['index', '-f', 'warc-type,warc-target-uri', 'test-transc2.warc.gz'])
+
+        out, err = capsys.readouterr()
+
+        expected = """\
+{"warc-type": "warcinfo"}
+{"warc-type": "resource", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv"}
+{"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.webm"}
+{"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.mp4"}
+{"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.mkv"}
+{"warc-type": "metadata", "warc-target-uri": "metadata://www.example.com/containing/page.html"}
+"""
+        assert out == expected

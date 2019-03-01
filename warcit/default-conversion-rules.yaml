@@ -1,0 +1,76 @@
+output_dir: ./conversions
+
+url_prefix: http://
+
+rules:
+  - &webm
+    name: webm
+    ext: webm
+    command: 'ffmpeg -y -i {input} -c:v vp9 -c:a libopus -speed 4 {output}'
+    mime: video/webm
+
+  - &mp4
+    name: mp4
+    ext: mp4
+    command: 'ffmpeg -y -i {input} {output}'
+    mime: video/mp4
+
+  - &ffv1_flac
+    name: ffv1_flac
+    ext: mkv
+    command: 'ffmpeg -y -i {input} -c:v ffv1 -c:a flac {output}'
+    mime: video/x-matroska
+    skip_as_source: true
+
+  # audio only
+  - &mp3
+    name: mp3
+    ext: mp3
+    command: 'ffmpeg -y -i {input} {output}'
+    mime: audio/mpeg
+
+  - &webm_audio
+    name: webm_audio
+    ext: webm
+    command: 'ffmpeg -y -i {input} -c:a libopus -speed 4 {output}'
+    mime: audio/webm
+
+  - &flac
+    name: flac
+    ext: flac
+    command: 'ffmpeg -y -i {input} -c:a flac {output}'
+    mime: audio/flac
+    skip_as_source: true
+
+
+file_types:
+  # Flash Video Conversions
+  # convert to webm, mp4 and lossless (ffv1/flac)
+  - ext: '.flv'
+    conversion_rules:
+      - *webm
+      - *mp4
+      - *ffv1_flac
+
+  # MP4 conversion
+  # convert to web and lossless (ffv1/flac)
+  - ext: '.mp4'
+    conversion_rules:
+      - *webm
+      - *ffv1_flac
+
+  # RM conversion
+  # convert to webm, mp4 and lossless (ffv1/flac)
+  - ext: '.rm'
+    conversion_rules:
+      - *webm
+      - *mp4
+      - *ffv1_flac
+
+  # RA audio-only conversion
+  # convert to webm (opus), mp3, lossless (flac)
+  - ext: '.ra'
+    conversion_rules:
+      - *webm_audio
+      - *mp3
+      - *flac
