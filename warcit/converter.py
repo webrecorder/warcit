@@ -5,6 +5,7 @@ import logging
 import re
 import os
 import subprocess
+import pkgutil
 
 from collections import defaultdict
 from argparse import ArgumentParser, RawTextHelpFormatter
@@ -15,13 +16,15 @@ from warcio.timeutils import timestamp_now
 
 logger = logging.getLogger('WARCIT')
 
+RULES_FILE = 'default-conversion-rules.yaml'
+
 RESULTS_FILE = 'warcit-conversion-results.yaml'
 
 
 # ============================================================================
 def main(args=None):
     parser = ArgumentParser(description='Perform format conversion based on ' +
-                                        'manifest (in preparation for WARC storage)')
+                                        'conversion rules (in preparation for WARC storage)')
 
     parser.add_argument('-V', '--version', action='version', version=get_version())
 
@@ -35,11 +38,11 @@ def main(args=None):
     parser.add_argument('--results', help='YAML file to write conversion results to',
                         default=RESULTS_FILE)
 
-    parser.add_argument('--url-prefix',
+    parser.add_argument('--rules', help='Conversion rules YAML file')
+
+    parser.add_argument('url_prefix',
                         help='''The base URL for all items to be included, including
                                 protocol. Example: https://cool.website:8080/files/''')
-
-    parser.add_argument('manifest', help='Conversion manifest YAML file')
 
     parser.add_argument('inputs', nargs='+',
                         help='''Paths of directories and/or files to be checked for conversion''')
@@ -48,7 +51,7 @@ def main(args=None):
 
     init_logging(r)
 
-    converter = FileConverter(manifest_filename=r.manifest,
+    converter = FileConverter(rules_filename=r.rules,
                               inputs=r.inputs,
                               url_prefix=r.url_prefix,
                               output_dir=r.output_dir,
@@ -59,23 +62,24 @@ def main(args=None):
 
 # ============================================================================
 class FileConverter(BaseTool):
-    def __init__(self, manifest_filename, inputs,
+    def __init__(self, rules_filename, inputs,
                  url_prefix=None,
                  output_dir=None,
                  results_file=None):
 
-        with open(manifest_filename, 'rt') as fh:
-            manifest = yaml.load(fh.read())
+        # if no rules specified, load default rules from package
+        if not rules_filename:
+            rules = yaml.load(pkgutil.get_data('warcit', RULES_FILE))
 
-        self.convert_stdout = manifest.get('convert_stdout')
+        else:
+            with open(rules_filename, 'rt') as fh:
+                rules = yaml.load(fh.read())
 
-        self.output_dir = output_dir or manifest['output_dir']
-        if not self.output_dir:
-            raise Exception('--output-dir param or output_dir setting in manifest is required')
+        self.convert_stdout = rules.get('convert_stdout')
 
-        url_prefix = url_prefix or manifest['url_prefix']
-        if not url_prefix:
-            raise Exception('--url_prefix param or url_prefix setting in manifest is required')
+        self.output_dir = output_dir or rules.get('output_dir', '.')
+
+        url_prefix = url_prefix or rules['url_prefix']
 
         self.results_file = results_file or RESULTS_FILE
 
@@ -84,10 +88,11 @@ class FileConverter(BaseTool):
         super(FileConverter, self).__init__(url_prefix=url_prefix,
                                             inputs=inputs)
 
-        for file_type in manifest['file_types']:
-            file_type['rx'] = re.compile(file_type['rx'])
+        for file_type in rules['file_types']:
+            if 'regex' in file_type:
+                file_type['regex'] = re.compile(file_type.get('regex'))
 
-        self.file_types = manifest['file_types']
+        self.file_types = rules['file_types']
 
     def write_results(self):
         filename = os.path.join(self.output_dir, self.results_file)
@@ -130,7 +135,14 @@ class FileConverter(BaseTool):
 
     def convert_file(self, file_info, dry_run=False, convert_stdout=None, convert_stderr=None):
         for file_type in self.file_types:
-            if file_type['rx'].match(file_info.url):
+            matched = False
+            # first, check by extension if available
+            if 'ext' in file_type and file_info.url.endswith(file_type['ext']):
+                matched = True
+            elif 'regex' in file_type and file_type['regex'].match(file_info.url):
+                matched = True
+
+            if matched:
                 self.logger.info('Converting: ' + file_info.url)
 
                 for conversion in file_type['conversion_rules']:
@@ -138,7 +150,10 @@ class FileConverter(BaseTool):
                         self.logger.debug('Skipping: ' + conversion['name'])
                         continue
 
-                    output = self.get_output_filename(file_info.full_filename + '.' + conversion['ext'])
+                    output = self.get_output_filename(file_info.full_filename + '.' + conversion['ext'],
+                                                      dry_run=dry_run,
+                                                      root_dir=file_info.root_dir)
+
                     self.logger.debug('Output Filename: ' + output)
                     command = conversion['command'].format(input=file_info.full_filename,
                                                            output=output)
@@ -162,8 +177,9 @@ class FileConverter(BaseTool):
 
                     self.results[file_info.url].append(result)
 
-    def get_output_filename(self, convert_filename, dry_run=False):
-        full_path = os.path.abspath(os.path.join(self.output_dir, convert_filename))
+    def get_output_filename(self, convert_filename, dry_run=False, root_dir=''):
+        rel_filename = os.path.relpath(convert_filename, root_dir)
+        full_path = os.path.abspath(os.path.join(self.output_dir, rel_filename))
 
         if not dry_run:
             self._ensure_dir(full_path)
