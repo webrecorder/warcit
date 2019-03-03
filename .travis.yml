@@ -21,7 +21,7 @@ matrix:
     - os: osx
       osx_image: xcode10.1
       language: generic
-      env: PY_VER=3.7.2
+      env: PY_VER=3.6.7
     
 
 addons:
@@ -39,6 +39,7 @@ addons:
 before_install: |
   if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
       eval "$(pyenv init -)";
+      pyenv install --list;
       PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install $PY_VER;
       pyenv global $PY_VER;
   fi
