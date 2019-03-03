@@ -34,12 +34,10 @@ addons:
     - pyenv
     - ffmpeg
     - libmagic
-    #update: true
 
 before_install: |
   if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
       eval "$(pyenv init -)";
-      pyenv install --list;
       PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install $PY_VER;
       pyenv global $PY_VER;
   fi
