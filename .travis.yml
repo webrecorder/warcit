@@ -9,6 +9,7 @@ python:
 
 os:
   - linux
+  - osx
 
 dist: xenial
 
@@ -18,6 +19,11 @@ addons:
   apt:
     packages:
     - ffmpeg
+
+  homebrew:
+    packages:
+    - ffmpeg
+    - libmagic
 
 install:
   - python setup.py install
