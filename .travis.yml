@@ -11,6 +11,19 @@ os:
   - linux
   - osx
 
+matrix:
+  include:
+    - os: linux
+      language: python
+      sudo: false
+
+    - os: osx
+      osx_image: xcode8
+      language: generic
+      sudo: required
+
+
+
 dist: xenial
 
 sudo: false
