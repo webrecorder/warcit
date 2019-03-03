@@ -14,9 +14,12 @@ sudo: false
 matrix:
   include:
     - os: osx
+      osx_image: xcode10.1
       language: generic
       env: PY_VER=2.7.15
+
     - os: osx
+      osx_image: xcode10.1
       language: generic
       env: PY_VER=3.7.2
     
@@ -31,7 +34,7 @@ addons:
     - pyenv
     - ffmpeg
     - libmagic
-    update: true
+    #update: true
 
 before_install: |
   if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
