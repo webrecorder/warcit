@@ -33,9 +33,9 @@ environment:
  
 install:
   - ps: Start-FileDownload $env:ffmpeg_download$env:ffmpeg_platform/static/ffmpeg-$env:ffmpeg_version-$env:ffmpeg_platform-static.zip
-  - "7z x ffmpeg-%ffmpeg_version%-%ffmpeg_platform%-static.zip"
-  - "PATH=%PATH%;%cd%\ffmpeg-%ffmpeg_version%-%ffmpeg_platform%-static\bin"
-  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
+  - 7z x ffmpeg-%ffmpeg_version%-%ffmpeg_platform%-static.zip
+  - PATH=%PATH%;%cd%\ffmpeg-%ffmpeg_version%-%ffmpeg_platform%-static\bin
+  - SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%
   - "python -m pip install --disable-pip-version-check --user --upgrade pip"
   - "pip install -U setuptools pytest"
   - "pip install coverage pytest-cov codecov"
