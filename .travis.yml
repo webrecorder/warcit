@@ -1,21 +1,37 @@
 language: python
 
-python:
-  - "2.7"
-  - "3.4"
-  - "3.5"
-  - "3.6"
-  - "3.7"
-
-os:
-  - linux
-  - osx
-
 dist: xenial
 
-osx_image: xcode8
-
 sudo: false
+
+matrix:
+  include:
+    - os: linux
+      python: 2.7
+    - os: linux
+      python: 3.4
+    - os: linux
+      python: 3.5
+    - os: linux
+      python: 3.6
+    - os: linux
+      python: 3.7
+    - os: osx
+      language: generic
+      env: PY_VER=2.7.15
+    - os: osx
+      language: generic
+      env: PY_VER=3.4.9
+    - os: osx
+      language: generic
+      env: PY_VER=3.5.6
+    - os: osx
+      language: generic
+      env: PY_VER=3.6.8
+    - os: osx
+      language: generic
+      env: PY_VER=3.7.2
+    
 
 addons:
   apt:
@@ -26,6 +42,16 @@ addons:
     packages:
     - ffmpeg
     - libmagic
+    update: true
+
+before_install: |
+  if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
+      brew update;
+      brew install pyenv;
+      eval "$(pyenv init -)";
+      PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install $PY_VER;
+      pyenv global $PY_VER;
+  fi
 
 install:
   - python setup.py install
