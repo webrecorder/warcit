@@ -31,7 +31,7 @@ addons:
     - pyenv
     - ffmpeg
     - libmagic
-#    update: true
+    update: true
 
 before_install: |
   if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
