@@ -7,20 +7,44 @@ python:
   - "3.6"
   - "3.7"
 
-os:
-  - linux
+dist: xenial
 
 sudo: false
 
 matrix:
   include:
-    - python: "3.7"
-      dist: xenial
-      sudo: required
+    - os: osx
+      osx_image: xcode10.1
+      language: generic
+      env: PY_VER=2.7.15
+
+    - os: osx
+      osx_image: xcode10.1
+      language: generic
+      env: PY_VER=3.6.7
+    
+
+addons:
+  apt:
+    packages:
+    - ffmpeg
+
+  homebrew:
+    packages:
+    - pyenv
+    - ffmpeg
+    - libmagic
+
+before_install: |
+  if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
+      eval "$(pyenv init -)";
+      PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install $PY_VER;
+      pyenv global $PY_VER;
+  fi
 
 install:
   - python setup.py install
-  - pip install -U pytest coverage pytest-cov codecov
+  - pip install -U pytest coverage pytest-cov codecov python-magic
 
 script:
   - python setup.py test

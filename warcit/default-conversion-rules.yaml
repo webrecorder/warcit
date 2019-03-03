@@ -12,7 +12,7 @@ rules:
   - &mp4
     name: mp4
     ext: mp4
-    command: 'ffmpeg -y -i {input} {output}'
+    command: 'ffmpeg -y -i {input} -strict -2 {output}'
     mime: video/mp4
 
   - &ffv1_flac
