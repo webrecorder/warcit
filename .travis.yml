@@ -19,17 +19,9 @@ addons:
     packages:
     - ffmpeg
 
-#matrix:
-#  include:
-#    - python: "3.7"
-#      dist: xenial
-
-before_install:
-  - sudo apt-get install -y  ffmpeg
-
 install:
   - python setup.py install
-  - pip install -U pytest coverage pytest-cov codecov
+  - pip install -U pytest coverage pytest-cov codecov python-magic
 
 script:
   - python setup.py test
