@@ -241,6 +241,7 @@ class TransclusionSerializer(object):
         contain_url = tc['url']
         contain_ts = tc.get('timestamp') or timestamp_now()
         contain_ts = str(contain_ts)
+        selector = tc.get('selector')
 
         if tc.get('metadata_file'):
             with open(tc.get('metadata_file'), 'rt') as fh:
@@ -250,6 +251,9 @@ class TransclusionSerializer(object):
             all_metadata = {}
             all_metadata['webpage_url'] = contain_url
             all_metadata['webpage_timestamp'] = contain_ts
+            if selector:
+                all_metadata['selector'] = selector
+
             formats = []
 
             if self.conversion_serializer:

@@ -5,10 +5,12 @@ import sys
 import zipfile
 import pytest
 import yaml
+import json
 
 from io import BytesIO
 from warcit.warcit import main
 from warcit.converter import main as converter_main
+from warcio import ArchiveIterator
 from warcio.cli import main as warcio_main
 
 
@@ -207,6 +209,8 @@ transclusions:
     def test_conversions(self, caplog):
         convert_source_dir = os.path.join(self.test_root, 'convert-test')
 
+        res = converter_main(['--dry-run', '-v', 'http://www.example.com/', convert_source_dir])
+
         res = converter_main(['-v', 'http://www.example.com/', convert_source_dir])
 
         convert_output_dir = os.path.join(self.root_dir, 'conversions')
@@ -229,12 +233,33 @@ transclusions:
         assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][1]['url'] == 'http://www.example.com/videos/barsandtone.flv.mp4'
         assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][2]['url'] == 'http://www.example.com/videos/barsandtone.flv.mkv'
 
-    def test_transclude_converted(self, capsys):
+    def test_conversion_records(self, capsys):
+        source_dir = os.path.join(self.test_root, 'convert-test')
+
+        res = main(['-o', '-v', '-n', 'test-convert.warc',
+                    '--conversions', self.conversion_results, 'http://www.example.com/', source_dir])
+
+        warcio_main(['index', '-f', 'warc-type,warc-target-uri', 'test-convert.warc.gz'])
+
+        out, err = capsys.readouterr()
+
+        expected = """\
+{"warc-type": "warcinfo"}
+{"warc-type": "resource", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv"}
+{"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.webm"}
+{"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.mp4"}
+{"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.mkv"}
+"""
+        assert out == expected
+
+
+    def test_transclusions_and_conversions(self, capsys):
         transclusions = """
 transclusions:
   http://www.example.com/videos/barsandtone.flv:
     - url: http://www.example.com/containing/page.html
       timestamp: 20190103020000
+      selector: object, embed
 """
 
         transclusions_file = os.path.join(self.root_dir, 'transclu2.yaml')
@@ -259,3 +284,25 @@ transclusions:
 {"warc-type": "metadata", "warc-target-uri": "metadata://www.example.com/containing/page.html"}
 """
         assert out == expected
+
+    def test_validate_json_metadata(self):
+        with open('test-transc2.warc.gz', 'rb') as fh:
+            for record in ArchiveIterator(fh):
+                if record.rec_type == 'metadata':
+                    assert record.rec_headers['Content-Type'] == 'application/vnd.youtube-dl_formats+json'
+                    data = record.raw_stream.read()
+
+        assert record.rec_headers.get('WARC-Date') == '2019-01-03T02:00:00Z'
+
+        assert record.rec_headers.get('WARC-Creation-Date') > record.rec_headers.get('WARC-Date')
+
+        metadata = json.loads(data.decode('utf-8'))
+
+        assert len(metadata['formats']) == 4
+
+        assert metadata['webpage_url'] == 'http://www.example.com/containing/page.html'
+        assert metadata['webpage_timestamp'] == '20190103020000'
+        assert metadata['selector'] == 'object, embed'
+
+        formats = ['webm', 'mp4', 'mkv', 'flv']
+        assert [format_['ext'] for format_ in metadata['formats']] == formats
