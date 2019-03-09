@@ -12,7 +12,7 @@ rules:
   - &mp4
     name: mp4
     ext: mp4
-    command: 'ffmpeg -y -i {input} -c:v libx264 -pix_fmt yuv420p -c:a aac {output}'
+    command: 'ffmpeg -y -i {input} -c:v libx264 -pix_fmt yuv420p -c:a aac -strict -2 {output}'
     mime: video/mp4
 
   - &ffv1_flac

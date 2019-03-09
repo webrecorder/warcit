@@ -217,9 +217,9 @@ transclusions:
 
         assert 'Converting: http://www.example.com/videos/barsandtone.flv' in caplog.text
 
-        assert os.path.isfile(os.path.join(convert_output_dir, 'convert-test', 'videos', 'barsandtone.flv.mp4'))
-        assert os.path.isfile(os.path.join(convert_output_dir, 'convert-test', 'videos', 'barsandtone.flv.webm'))
-        assert os.path.isfile(os.path.join(convert_output_dir, 'convert-test', 'videos', 'barsandtone.flv.mkv'))
+        assert os.path.isfile(os.path.join(convert_output_dir, 'test', 'convert-test', 'videos', 'barsandtone.flv.mp4'))
+        assert os.path.isfile(os.path.join(convert_output_dir, 'test', 'convert-test', 'videos', 'barsandtone.flv.webm'))
+        assert os.path.isfile(os.path.join(convert_output_dir, 'test', 'convert-test', 'videos', 'barsandtone.flv.mkv'))
 
         TestWarcIt.conversion_results = os.path.join(convert_output_dir, 'warcit-conversion-results.yaml')
 
@@ -232,6 +232,9 @@ transclusions:
         assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][0]['url'] == 'http://www.example.com/videos/barsandtone.flv.webm'
         assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][1]['url'] == 'http://www.example.com/videos/barsandtone.flv.mp4'
         assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][2]['url'] == 'http://www.example.com/videos/barsandtone.flv.mkv'
+
+        for conv in results['conversions']['http://www.example.com/videos/barsandtone.flv']:
+            assert conv['success'] == True
 
     def test_conversion_records(self, capsys):
         source_dir = os.path.join(self.test_root, 'convert-test')

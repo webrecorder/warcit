@@ -179,7 +179,7 @@ class FileConverter(BaseTool):
 
     def get_output_filename(self, convert_filename, dry_run=False, root_dir=''):
         rel_filename = os.path.relpath(convert_filename, root_dir)
-        full_path = os.path.abspath(os.path.join(self.output_dir, rel_filename))
+        full_path = os.path.abspath(os.path.join(self.output_dir, os.path.basename(root_dir), rel_filename))
 
         if not dry_run:
             self._ensure_dir(full_path)
