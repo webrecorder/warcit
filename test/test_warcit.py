@@ -228,10 +228,11 @@ transclusions:
         with open(self.conversion_results) as fh:
             results = yaml.load(fh.read())
 
-        assert len(results['conversions']['http://www.example.com/videos/barsandtone.flv']) == 3
-        assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][0]['url'] == 'http://www.example.com/videos/barsandtone.flv.webm'
-        assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][1]['url'] == 'http://www.example.com/videos/barsandtone.flv.mp4'
-        assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][2]['url'] == 'http://www.example.com/videos/barsandtone.flv.mkv'
+        assert len(results['conversions']['http://www.example.com/videos/barsandtone.flv']) == 4
+        assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][0]['url'] == 'http://www.example.com/videos/barsandtone.flv.png'
+        assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][1]['url'] == 'http://www.example.com/videos/barsandtone.flv.webm'
+        assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][2]['url'] == 'http://www.example.com/videos/barsandtone.flv.mp4'
+        assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][3]['url'] == 'http://www.example.com/videos/barsandtone.flv.mkv'
 
         for conv in results['conversions']['http://www.example.com/videos/barsandtone.flv']:
             assert conv['success'] == True
@@ -249,6 +250,7 @@ transclusions:
         expected = """\
 {"warc-type": "warcinfo"}
 {"warc-type": "resource", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv"}
+{"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.png"}
 {"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.webm"}
 {"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.mp4"}
 {"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.mkv"}
@@ -281,6 +283,7 @@ transclusions:
         expected = """\
 {"warc-type": "warcinfo"}
 {"warc-type": "resource", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv"}
+{"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.png"}
 {"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.webm"}
 {"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.mp4"}
 {"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.mkv"}
@@ -301,11 +304,11 @@ transclusions:
 
         metadata = json.loads(data.decode('utf-8'))
 
-        assert len(metadata['formats']) == 4
+        assert len(metadata['formats']) == 5
 
         assert metadata['webpage_url'] == 'http://www.example.com/containing/page.html'
         assert metadata['webpage_timestamp'] == '20190103020000'
         assert metadata['selector'] == 'object, embed'
 
-        formats = ['webm', 'mp4', 'mkv', 'flv']
+        formats = ['png', 'webm', 'mp4', 'mkv', 'flv']
         assert [format_['ext'] for format_ in metadata['formats']] == formats

@@ -3,6 +3,13 @@ output_dir: ./conversions
 url_prefix: http://
 
 rules:
+  - &png_poster
+    name: png_poster
+    ext: png
+    command: "ffmpeg -i {input} -vf thumbnail,scale=640:360 -frames:v 1 {output}"
+    mime: image/png
+    poster: true
+
   - &webm
     name: webm
     ext: webm
@@ -26,7 +33,7 @@ rules:
   - &mp3
     name: mp3
     ext: mp3
-    command: 'ffmpeg -y -i {input} {output}'
+    command: 'ffmpeg -y -i {input} -c:a libmp3lame -b:a 320k {output}'
     mime: audio/mpeg
 
   - &webm_audio
@@ -48,6 +55,7 @@ file_types:
   # convert to webm, mp4 and lossless (ffv1/flac)
   - ext: '.flv'
     conversion_rules:
+      - *png_poster
       - *webm
       - *mp4
       - *ffv1_flac
@@ -56,6 +64,7 @@ file_types:
   # convert to web and lossless (ffv1/flac)
   - ext: '.mp4'
     conversion_rules:
+      - *png_poster
       - *webm
       - *ffv1_flac
 
@@ -63,6 +72,7 @@ file_types:
   # convert to webm, mp4 and lossless (ffv1/flac)
   - ext: '.rm'
     conversion_rules:
+      - *png_poster
       - *webm
       - *mp4
       - *ffv1_flac
