@@ -114,14 +114,14 @@ The datetime can be specified as ``--fixed-dt YYYY-MM-DDTHH:mm:ss`` or ``--fixed
 eg. ``--fixed-dt YYYY-MM``
 
 
-The actual WARC creation time and path to the source file on disk are also stored, using the ``WARC-Created-Date``
+The actual WARC creation time and path to the source file on disk are also stored, using the ``WARC-Creation-Date``
 and ``WARC-Source-URI`` extension headers, respectively.
 
 For example, if when running ``warcit --fixed-dt 2011-02 http://example.com/ ./path/to/somefile.html``, the resulting WARC Record might look as follows::
 
   WARC/1.0
   WARC-Date: 2011-02-01T00:00:00Z
-  WARC-Created-Date: 2017-12-05T18:30:58Z
+  WARC-Creation-Date: 2017-12-05T18:30:58Z
   WARC-Source-URI: file://./path/to/somefile.html
   WARC-Type: resource
   WARC-Record-ID: ...
