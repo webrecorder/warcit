@@ -95,7 +95,7 @@ class TestWarcIt(object):
 
         out, err = capsys.readouterr()
         out = out.lower() # charset names might be uppercase or lowercase
-        assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=windows-1252"' in out
+        assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=windows-1258"' in out
         assert '"warc-target-uri": "http://www.iana.org/_css/2015.1/print.css", "content-type": "text/css; charset=utf-8"' in out
 
     def test_warcit_use_charset_custom(self, capsys):
@@ -204,7 +204,7 @@ transclusions:
 
         out, err = capsys.readouterr()
 
-        assert '"warc-type": "metadata", "warc-target-uri": "metadata://www.example.com/containing/page.html, "warc-date": "2019-01-02T03:00:00Z"' not in out
+        assert '"warc-type": "resource", "warc-target-uri": "urn:embeds:http://www.example.com/containing/page.html, "warc-date": "2019-01-02T03:00:00Z"' not in out
 
     def test_conversions(self, caplog):
         convert_source_dir = os.path.join(self.test_root, 'convert-test')
@@ -287,14 +287,20 @@ transclusions:
 {"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.webm"}
 {"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.mp4"}
 {"warc-type": "conversion", "warc-target-uri": "http://www.example.com/videos/barsandtone.flv.mkv"}
-{"warc-type": "metadata", "warc-target-uri": "metadata://www.example.com/containing/page.html"}
+{"warc-type": "resource", "warc-target-uri": "urn:embeds:http://www.example.com/containing/page.html"}
 """
         assert out == expected
 
     def test_validate_json_metadata(self):
+        first = True
         with open('test-transc2.warc.gz', 'rb') as fh:
             for record in ArchiveIterator(fh):
-                if record.rec_type == 'metadata':
+                if record.rec_type == 'resource':
+                    # skip first, which is original
+                    if first:
+                        first = False
+                        continue
+
                     assert record.rec_headers['Content-Type'] == 'application/vnd.youtube-dl_formats+json'
                     data = record.raw_stream.read()
 

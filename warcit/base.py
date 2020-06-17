@@ -64,7 +64,7 @@ class BaseTool(object):
         zip_path = []
         while filename:
             if os.path.isfile(filename):
-                if zipfile.is_zipfile(filename):
+                if filename.endswith('.zip') and zipfile.is_zipfile(filename):
                     return True, filename, '/'.join(zip_path)
                 else:
                     return False, filename, ''

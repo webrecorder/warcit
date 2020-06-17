@@ -522,7 +522,6 @@ class WARCIT(BaseTool):
             self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(url, warc_content_type, warc_date,
                                                                               file_info.full_filename))
 
-
         self.write_logfile({
             'file': file_info.full_filename,
             'Record-Type': record_type,
@@ -574,10 +573,11 @@ class WARCIT(BaseTool):
     def make_transclusion_metadata(self, writer, url, record):
         content_type = record.rec_headers.get('Content-Type')
         for url, timestamp, metadata in self.transclusion_serializer.find_transclusions(url, content_type):
-            if url.startswith('http://'):
-                url = url.replace('http://', 'metadata://')
-            elif url.startswith('https://'):
-                url = url.replace('https://', 'metadata://')
+            #if url.startswith('http://'):
+            #    url = url.replace('http://', 'metadata://')
+            #elif url.startswith('https://'):
+            #    url = url.replace('https://', 'metadata://')
+            embeds_url = 'urn:embeds:' + url
 
             content = json.dumps(metadata, indent=2, sort_keys=True).encode('utf-8')
 
@@ -590,23 +590,23 @@ class WARCIT(BaseTool):
 
             warc_content_type = 'application/vnd.youtube-dl_formats+json'
 
-            record = writer.create_warc_record(url, 'metadata',
+            record = writer.create_warc_record(embeds_url, 'resource',
                                       payload=BytesIO(content),
                                       length=len(content),
                                       warc_content_type=warc_content_type,
                                       warc_headers_dict=warc_headers)
 
-            logging.debug('Writing transclusion metadata at {0}'.format(url))
+            logging.debug('Writing transclusion metadata at {0}'.format(embeds_url))
 
             writer.write_record(record)
             self.count += 1
 
-            self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(url, warc_content_type, warc_date, '-'))
+            self.logger.debug('Writing "{0}" ({1}) @ "{2}" from "{3}"'.format(embeds_url, warc_content_type, warc_date, '-'))
 
             self.write_logfile({
                 'file': '-',
                 'Record-Type': 'metadata',
-                'URL': url,
+                'URL': embeds_url,
                 'timestamp': warc_date,
                 })
 
