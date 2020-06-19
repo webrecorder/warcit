@@ -43,6 +43,13 @@ class TestWarcIt(object):
         assert 'Wrote 24 resources to www.iana.org.warc.gz' in caplog.text
         assert os.path.isfile(os.path.join(self.root_dir, 'www.iana.org.warc.gz'))
 
+    def test_warcit_overwrite_with_excludes(self, caplog):
+        res = main(['http://www.iana.org/', '-o', '--exclude', '*.js', self.test_dir])
+        assert res == 0
+
+        assert 'Wrote 22 resources to www.iana.org.warc.gz' in caplog.text
+        assert os.path.isfile(os.path.join(self.root_dir, 'www.iana.org.warc.gz'))
+
     def test_warcit_already_exists(self, caplog):
         res = main(['http://www.iana.org/', '-q', self.test_dir])
         assert res == 1

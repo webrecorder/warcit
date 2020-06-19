@@ -424,7 +424,12 @@ class WARCIT(BaseTool):
             self.make_warcinfo(writer)
 
             for file_info in self.iter_inputs():
-                url, record = self.make_record(writer, file_info)
+                result = self.make_record(writer, file_info)
+                if not result:
+                    self.logger.debug('Skipping {0}'.format(file_info.url))
+                    continue
+
+                url, record = result
 
                 # Current file serves as a directory index
                 if url.lower().endswith(self.index_files):
