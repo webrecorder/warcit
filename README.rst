@@ -141,5 +141,11 @@ For example, when running:
 
 - a ``revisit`` record for ``http://example.com/path/subdir/`` pointing to ``http://example.com/path/subdir/index.html``
 
+WARC Video Conersions and Embeds Manifest
+-----------------------------------------
 
+With warcit 0.4.0, warcit also includes ``warcit-converter`` and the ability to 
+use ``ffmpeg`` to generate video/audio conversions, store them as conversion records and generate a manifest.
 
+See `WARCIT Media Conversions and Transclusions` <conversions-and-transclusions.md>`_ for more details on how to convert video/audio, create WARC
+records and metadata to support replay of converted media.

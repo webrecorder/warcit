@@ -69,11 +69,11 @@ class FileConverter(BaseTool):
 
         # if no rules specified, load default rules from package
         if not rules_filename:
-            rules = yaml.load(pkgutil.get_data('warcit', RULES_FILE))
+            rules = yaml.safe_load(pkgutil.get_data('warcit', RULES_FILE))
 
         else:
             with open(rules_filename, 'rt') as fh:
-                rules = yaml.load(fh.read())
+                rules = yaml.safe_load(fh.read())
 
         self.convert_stdout = rules.get('convert_stdout')
 
@@ -101,7 +101,7 @@ class FileConverter(BaseTool):
 
         try:
             with open(filename, 'rt') as fh:
-                root = yaml.load(fh.read())
+                root = yaml.safe_load(fh.read())
         except:
             root = {}
 
@@ -198,7 +198,7 @@ class FileConverter(BaseTool):
 class ConversionSerializer(object):
     def __init__(self, results_filename):
         with open(results_filename, 'rt') as fh:
-            results = yaml.load(fh.read())
+            results = yaml.safe_load(fh.read())
 
         self.conversions = results.get('conversions', {})
 
@@ -220,7 +220,7 @@ class ConversionSerializer(object):
 class TransclusionSerializer(object):
     def __init__(self, transclusions_filename, conversions=None):
         with open(transclusions_filename, 'rt') as fh:
-            results = yaml.load(fh.read())
+            results = yaml.safe_load(fh.read())
 
         self.transclusions = results.get('transclusions', {})
 

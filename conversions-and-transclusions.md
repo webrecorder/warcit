@@ -1,4 +1,4 @@
-# WARCIT Media Conversion and Transclusion Workflow
+# WARCIT Media Conversion Workflow
 
 With the 0.4.0, warcit introduces a new workflow for converting video/audio files into web-friendly formats
 and then placing them into WARCs along with transclusion metadata to enable access from within a containing page.
@@ -23,7 +23,7 @@ For example, given a directory structure:
 
 Running:
 
-```
+```bash
 warcit-converter http://www.example.com/ ./data/
 ```
 
@@ -81,7 +81,7 @@ It is also possible to specify a custom rules YAML file via the `warcit-converte
 
 To include `conversion` record creation along with simply include the conversion results output as a parameter to `warcit`:
 
-```
+```bash
 warcit --conversions ./conversion/warcit-conversion-results.yaml http://example.com/ ./data/ -o output.warc.gz
 ```
 
@@ -98,7 +98,8 @@ The information on which resources are transcluded from which pages is not possi
 warcit supports a transclusion manifest YAML file, which can map resources to their containing/transcluding pages. A manifest might look as follows:
 
 transclusions.yaml:
-```
+
+```yaml
 transclusions:
   http://example.com/media/video_file.flv:
     url: http://example.com/watch_video.html
@@ -123,7 +124,7 @@ also be added as metadata.
 
 `warcit` might then be run as follows:
 
-```
+```bash
 warcit --transclusions transclusions.yaml --conversions ./conversion/warcit-conversion-results.yaml http://example.com/ ./data/ -o output.warc.gz
 ```
 
@@ -135,7 +136,7 @@ The generated metadata JSON is originally modeled on the youtube-dl metadata (an
 
 The JSON metadata record for `metadata://example.com/watch_video.html` might look as follows:
 
-```
+```json
 {
 
   "formats": [
@@ -183,7 +184,7 @@ Based on this metadata, the pywb client side rewriting system can replace an `<o
 or `<embed>` tag based on the selector `object,embed`
 for example:
 
-```
+```html
 <video>
   <source src="http://example.com/media/video_file.webm" type="video/webm"/>
   <source src="http://example.com/media/video_file.flv.mp4" type="video/mp4"/>
@@ -194,7 +195,9 @@ for example:
 (The `.mkv` format is not included as its marked as `skip_as_source` while the .flv is included for completeness as the original)
 
 
-## Proposal: Multiple Transcluded Objects Per Page 
+## Proposal: Multiple Transcluded Objects Per Page
+
+*This is a proposal and has not yet been implemented.*
 
 The current format is designed for a single transcluded object. However, it is likely that there will be pages with multiple transcluded
 objects. Further, it is possible that additional transclusions + conversions may be added later.
@@ -212,7 +215,7 @@ The top-level JSON object in the previous example is instead placed into its own
 This format, given content-type `application/vnd.transclusions+json` might look as follows.
 For a given entry, `metadata://example.com/watch_page.html`, 2 videos may be listed:
 
-```
+```json
 {
   "transclusions":
     {"http://example.com/media/video_file.flv": {..., "formats": {...}},
