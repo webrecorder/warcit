@@ -114,7 +114,7 @@ transclusions:
 ```
 
 Given this input, running `warcit --transclusions transclusions.yaml` will generate a reverse index, a `metadata` record for the containing pages, which point to the media files transcluded from that page. For the above example, two metadata records, with target uris
-`metadata://example.com/watch_video.html` and `metadata//example.com/sample_audio.html` will be created.
+`urn:embeds:http://example.com/watch_video.html` and `urn:embeds:http://example.com/sample_audio.html` will be created.
 
 The metadata records will simply point to the transclusions, `http://example.com/media/video_file.flv` and
 `http://example.com/media/an_audio_file.ra` respectively.
@@ -134,7 +134,7 @@ Note that the transclusion manifest should only contain the urls of the original
 
 The generated metadata JSON is originally modeled on the youtube-dl metadata (and has Content-Type `application/vnd.youtube-dl_formats+json`)
 
-The JSON metadata record for `metadata://example.com/watch_video.html` might look as follows:
+The JSON metadata record for `urn:embeds:http://example.com/watch_video.html` might look as follows:
 
 ```json
 {
@@ -213,7 +213,7 @@ To handle all of these cases, a more flexible metadata format is proposed.
 The top-level JSON object in the previous example is instead placed into its own dictionary.
 
 This format, given content-type `application/vnd.transclusions+json` might look as follows.
-For a given entry, `metadata://example.com/watch_page.html`, 2 videos may be listed:
+For a given entry, `urn:embeds:http://example.com/watch_page.html`, 2 videos may be listed:
 
 ```json
 {
