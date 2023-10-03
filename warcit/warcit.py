@@ -40,7 +40,7 @@ def main(args=None):
 
     parser.add_argument('url_prefix',
                         help='''The base URL for all items to be included, including
-                                protocol. Example: https://cool.website:8080/files/''')
+                                protocol and trailing slash. Example: https://cool.website:8080/files/''')
     parser.add_argument('inputs', nargs='+',
                         help='''Paths of directories and/or files to be included in
                                 the WARC file.''')
