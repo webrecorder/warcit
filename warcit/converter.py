@@ -30,6 +30,8 @@ def main(args=None):
 
     parser.add_argument('--dry-run', action='store_true')
 
+    parser.add_argument('--overwrite', action='store_true', help="Overwrite output files")
+
     parser.add_argument('--output-dir', help='Root output directory for conversions')
 
     parser.add_argument('-q', '--quiet', action='store_true')
@@ -57,7 +59,7 @@ def main(args=None):
                               output_dir=r.output_dir,
                               results_file=r.results)
 
-    converter.convert_all(dry_run=r.dry_run)
+    converter.convert_all(dry_run=r.dry_run,overwrite=r.overwrite)
 
 
 # ============================================================================
@@ -114,7 +116,7 @@ class FileConverter(BaseTool):
         with open(filename, 'wt') as fh:
             fh.write(yaml.dump(root, default_flow_style=False))
 
-    def convert_all(self, dry_run=False):
+    def convert_all(self, dry_run=False, overwrite=False):
         stdout = None
         if self.convert_stdout:
             stdout = open(self.convert_stdout, 'wt')
@@ -124,7 +126,8 @@ class FileConverter(BaseTool):
                 self.convert_file(file_info,
                                   dry_run=dry_run,
                                   convert_stdout=stdout,
-                                  convert_stderr=stdout)
+                                  convert_stderr=stdout,
+                                  overwrite=overwrite)
 
                 if not dry_run:
                     self.write_results()
@@ -133,7 +136,7 @@ class FileConverter(BaseTool):
             if stdout:
                 stdout.close()
 
-    def convert_file(self, file_info, dry_run=False, convert_stdout=None, convert_stderr=None):
+    def convert_file(self, file_info, dry_run=False, convert_stdout=None, convert_stderr=None, overwrite=False):
         for file_type in self.file_types:
             matched = False
             # first, check by extension if available
@@ -155,6 +158,18 @@ class FileConverter(BaseTool):
                                                       root_dir=file_info.root_dir)
 
                     self.logger.debug('Output Filename: ' + output)
+
+                    # Do not overwrite existing files:
+                    if os.path.exists(output) and not overwrite:
+                        self.logger.warning(f"Path {output} already exists! Skipping {conversion['name']}")
+                        continue
+
+                    # Define a temporary name so updates will be atomic
+                    original_output = output
+                    tmp_name = f"tmp_{os.path.basename(output)}"
+                    output = os.path.join(os.path.dirname(output), tmp_name)
+
+                    # Set up the command to run:
                     command = conversion['command'].format(input=file_info.full_filename,
                                                            output=output)
 
@@ -167,6 +182,10 @@ class FileConverter(BaseTool):
                                           stderr=convert_stderr)
 
                     self.logger.debug('Exit Code: {0}'.format(res))
+
+                    # Move the _tmp file to the final filename:
+                    os.rename(output, original_output)
+                    output = original_output
 
                     result = {'url': file_info.url + '.' + conversion['ext'],
                               'output': output,
