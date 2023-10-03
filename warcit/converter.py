@@ -166,7 +166,8 @@ class FileConverter(BaseTool):
 
                     # Define a temporary name so updates will be atomic
                     original_output = output
-                    output = f"{output}_tmp"
+                    tmp_name = f"tmp_{os.path.basename(output)}"
+                    output = os.path.join(os.path.dirname(output), tmp_name)
 
                     # Set up the command to run:
                     command = conversion['command'].format(input=file_info.full_filename,
