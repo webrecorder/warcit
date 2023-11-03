@@ -131,7 +131,8 @@ def main(args=None):
                         metavar='<FILENAME>')
 
     parser.add_argument('--log',
-                        help='''Write a log file in CSV format.''',
+                        help='''Base name for the CSV log file, appropriate extension will be
+                                added automatically.''',
                         metavar='<FILENAME>')
 
     parser.add_argument('--conversions')
@@ -164,7 +165,7 @@ def main(args=None):
                   mapfile=r.mapfile,
                   include=r.include,
                   exclude=r.exclude,
-                  logfile=r.log,
+                  logfile=r.log + str(".csv"),
                   args=args,
                   conversions=r.conversions,
                   transclusions=r.transclusions,
