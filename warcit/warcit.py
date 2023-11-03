@@ -241,7 +241,7 @@ class WARCIT(BaseTool):
             self.use_mapfile = True
             self.mapfile = mapfile
 
-        self.logfile = logfile + str(".csv")
+        self.logfile = str(logfile + '.csv')
         self.use_logfile = False
         if self.logfile:
             self.use_logfile = True
