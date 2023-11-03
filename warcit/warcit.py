@@ -165,7 +165,7 @@ def main(args=None):
                   mapfile=r.mapfile,
                   include=r.include,
                   exclude=r.exclude,
-                  logfile=r.log + str(".csv"),
+                  logfile=r.log,
                   args=args,
                   conversions=r.conversions,
                   transclusions=r.transclusions,
@@ -241,7 +241,7 @@ class WARCIT(BaseTool):
             self.use_mapfile = True
             self.mapfile = mapfile
 
-        self.logfile = logfile
+        self.logfile = logfile + str(".csv")
         self.use_logfile = False
         if self.logfile:
             self.use_logfile = True
