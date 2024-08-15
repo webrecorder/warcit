@@ -552,7 +552,7 @@ class WARCIT(BaseTool):
         revisit_record = writer.create_revisit_record(index_url, digest, url, warc_date, None, warc_headers_dict\
                     = {"WARC-Date" : warc_date})
 
-        revisit_record.rec_headers['WARC-Creation-Date'] = warc_date
+        revisit_record.rec_headers['WARC-Creation-Date'] = creation_date
         revisit_record.rec_headers['WARC-Source-URI'] = source_uri
 
         self.count += 1
