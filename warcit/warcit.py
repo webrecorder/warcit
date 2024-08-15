@@ -545,12 +545,14 @@ class WARCIT(BaseTool):
         self.logger.debug('Adding auto-index: {0} -> {1}'.format(index_url, url))
 
         warc_date = record.rec_headers['WARC-Date']
+        creation_date = record.rec_headers['WARC-Creation-Date']
         source_uri = record.rec_headers['WARC-Source-URI']
+        
+        # warc_date of the index file is handed down so that revisit record has the same date as index file
+        revisit_record = writer.create_revisit_record(index_url, digest, url, warc_date, None, warc_headers_dict\
+                    = {"WARC-Date" : warc_date})
 
-        revisit_record = writer.create_revisit_record(index_url, digest, url, warc_date)
-
-        # no creation date needed, as it matches warc-date
-        #revisit_record.rec_headers['WARC-Creation-Date'] = warc_date
+        revisit_record.rec_headers['WARC-Creation-Date'] = warc_date
         revisit_record.rec_headers['WARC-Source-URI'] = source_uri
 
         self.count += 1
