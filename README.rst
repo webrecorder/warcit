@@ -9,6 +9,13 @@ Conversion to WARC file allows for improved durability in a standardized format,
 
 WARCIT supports converting individual files, directories (including any nested directories) as well as ZIP files into WARCs.
 
+Install
+-----------
+
+Use pip to install the command line utility as a Python package:
+
+``pip install warcit``
+
 
 Basic Usage
 -----------
