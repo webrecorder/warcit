@@ -1,6 +1,6 @@
 # WARCIT Media Conversion Workflow
 
-With the 0.4.0, warcit introduces a new workflow for converting video/audio files into web-friendly formats
+With the 0.4.0 release, warcit introduces a new workflow for converting video/audio files into web-friendly formats
 and then placing them into WARCs along with transclusion metadata to enable access from within a containing page.
 
 To allow for maximum flexibility, this process is split into two phases: conversion and transclusion WARC creation.
@@ -14,7 +14,7 @@ converted files into a separate directory, recreating the same directory structu
 
 For example, given a directory structure:
 
-```
+```txt
 - data/
     - videos/
          - video_file.flv
@@ -27,7 +27,7 @@ Running:
 warcit-converter http://www.example.com/ ./data/
 ```
 
- with the default rules will result in converted files written into `./conversions` directory (by default).
+with the default rules will result in converted files written into `./conversions` directory (by default).
 
 The full url of each file, as with warcit, is created by prepending the prefix to the path in the directory.
 
@@ -35,7 +35,7 @@ The input media in this example would have a full url of `http://example.com/med
 `http://example.com/media/an_audio_file.ra`. The converted files simply have additional extensions added
 for the full url, such as: `http://example.com/media/video_file.flv.mp4`, `http://example.com/media/an_audio_file.ra.webm`, etc...
 
-```
+```txt
 - data/
     - media/
          - video_file.flv
@@ -61,9 +61,9 @@ The [default rule set](https://github.com/webrecorder/warcit/blob/video-conversi
 
 The current output formats are two web-focused formats and a preservation format:
 
-* .webm -- vpx9 + opus encoded video + audio, an open format for the web
-* .mp4 -- H.264 + AAC encoded video + audio, primarily for Safari and Apple based platforms.
-* .mkv -- [FFV1](https://en.wikipedia.org/wiki/FFV1) codec in a Matroska container.
+- .webm -- vpx9 + opus encoded video + audio, an open format for the web
+- .mp4 -- H.264 + AAC encoded video + audio, primarily for Safari and Apple based platforms.
+- .mkv -- [FFV1](https://en.wikipedia.org/wiki/FFV1) codec in a Matroska container.
 
 (For audio only content, .webm, .mp3 and .flac are used instead)
 
@@ -204,6 +204,7 @@ objects. Further, it is possible that additional transclusions + conversions may
 And, different versions of a page may have different numbers of videos.
 
 For example:
+
 - A page has multiple videos but only one was initially available. Later, additional content with two more videos was discovered.
 - A page has one video that needed to be converted and one that played natively in the current browser. Later, the other video also needed to be converted.
 - An initial capture of a page has two video that were converted. A later capture has only one video (the other was removed, or shifted to a new page, etc...)
@@ -232,7 +233,7 @@ For a given entry, `urn:embeds:http://example.com/watch_page.html`, 2 videos may
 However, at a later time, another transclusion is discovered for the same page and 
 added with a new metadata record:
 
-```
+```json
 {
   "transclusions":
     {"http://example.com/media/yet_another_video.flv": {..., "formats": {...}},
@@ -246,7 +247,7 @@ added with a new metadata record:
 When loading the page `20160102/http://www.example.com/watch_video.html`, both transclusion
 metadata records will be loaded, and all 3 videos will be readded to the page, if possible.
 
-```
+```txt
 - "http://example.com/media/video_file.flv"
 - "http://example.com/media/another_video_file.flv"
 - "http://example.com/media/yet_another_video.flv"
@@ -260,7 +261,7 @@ the actual creation date is set in the `WARC-Creation-Date` header.
 However, if a later version of the same page contains *different* transclusions, only those transclusions
 should be loaded. For example, the `20170102` version of the page may have only one video:
 
-```
+```json
 {
   "transclusions":
     {"http://example.com/media/video_file.flv": {..., "formats": {...}},
@@ -277,7 +278,7 @@ When replaying a particular page, all of the exact match transclusions will be u
 
 * When replaying `20160203/http://www.example.com/watch_video.htm`, the closest transclusion metadata are:
 
-```
+```txt
 20160102/http://www.example.com/watch_video.html -- 2 videos
 20160102/http://www.example.com/watch_video.html -- 1 video
 ```
@@ -286,7 +287,7 @@ Since there two records at the exact same timestamp, they will be combined and 3
 
 * When replaying `20170203//http://www.example.com/watch_video.htm` the closest transclusion metadata record is:
 
-```
+```txt
 20170102/http://www.example.com/watch_video.html -- 1 video
 ```
 
@@ -294,4 +295,3 @@ Since there is only one match, the 1 video from this record is used. Additional 
 farther away are not searched.
 
 If additional captures require custom sets of transclusions, additional records can be added at the exact capture time.
-
