@@ -131,7 +131,8 @@ def main(args=None):
                         metavar='<FILENAME>')
 
     parser.add_argument('--log',
-                        help='''Write a log file in CSV format.''',
+                        help='''Base name for the CSV log file, appropriate extension will be
+                                added automatically.''',
                         metavar='<FILENAME>')
 
     parser.add_argument('--conversions')
@@ -240,7 +241,7 @@ class WARCIT(BaseTool):
             self.use_mapfile = True
             self.mapfile = mapfile
 
-        self.logfile = logfile
+        self.logfile = str(logfile + '.csv')
         self.use_logfile = False
         if self.logfile:
             self.use_logfile = True
