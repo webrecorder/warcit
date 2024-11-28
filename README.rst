@@ -3,7 +3,7 @@ WARCIT
 
 ``warcit`` is a command-line tool to convert on-disk directories of web documents (commonly HTML, web assets and any other data files) into an ISO standard web archive (WARC) files.
 
-Conversion to WARC file allows for improved durability in a standardized format, and allows for any web files stored on disk to be uploaded into  `Webrecorder <https://github.com/webrecorder/webrecorder>`_, or replayed locally with `Webrecorder Player <https://github.com/webrecorder/webrecorderplayer-electron/releases>`_ or  `pywb <https://github.com/ikreymer/pywb>`_
+Conversion to WARC file allows for improved durability in a standardized format, and allows any website files stored on disk to be replayed locally through `ReplayWeb.page <https://webrecorder.net/replaywebpage/>`_ or  `pywb <https://github.com/webrecorder/pywb>`_
 
 (Many other tools also operate on WARC files, see: `Awesome Web Archiving -- Tools and Software <https://github.com/iipc/awesome-web-archiving#tools--software>`_)
 
