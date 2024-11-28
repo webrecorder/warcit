@@ -36,7 +36,7 @@ The WARC ``www.iana.org.warc.gz`` should now have been created!
 Mime Type Detection and Overrides
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-By default, ``warcit`` supports the the default Python ``mimetypes`` library to determine a mime type based on a file extension.
+By default, ``warcit`` supports the default Python ``mimetypes`` library to determine a mime type based on a file extension.
 
 However, it also supports using `python-magic <https://pypi.python.org/pypi/python-magic>`_ (libmagic) if available and custom mime overrides configured via the command line.
 
@@ -51,7 +51,7 @@ The mime detection is as follows:
 4) Default to ``text/html`` if all previous attempts did not yield a mime type.
 
 
-The ``--mime-overrides`` flag can be used to specify wildcard query (applied to the full url) and corresponding mime types as a comma-delimeted property list::
+The ``--mime-overrides`` flag can be used to specify wildcard query (applied to the full url) and corresponding mime types as a comma-delimited property list::
 
   warcit '--mime-overrides=*.html=text/html; charset="utf-8",image.ico=image/png' http://www.iana.org/ ./www.iana.org/
 
@@ -116,7 +116,7 @@ The warcinfo record contains the full command line and warcit version::
 Each file specified or found in the directory is stored as a WARC ``resource`` record.
 
 By default, warcit uses the file-modified date as the ``WARC-Date`` of each url.
-This setting can be overriden with a fixed date time by specifying the ``--fixed-dt`` flag.
+This setting can be overridden with a fixed date time by specifying the ``--fixed-dt`` flag.
 The datetime can be specified as ``--fixed-dt YYYY-MM-DDTHH:mm:ss`` or ``--fixed-dt YYYYMMDDHHmmss`` or partial date,
 eg. ``--fixed-dt YYYY-MM``
 
