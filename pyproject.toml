@@ -1,0 +1,28 @@
+[project]
+name = "warcit"
+version = "0.4.0"
+description = "Create WARC files from a directory"
+readme = "README.rst"
+authors = [
+    { name = "Ilya Kreymer" }
+]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+keywords = [
+    "warc",
+    "webrecorder",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "warcio>=1.6.1",
+    "cchardet",
+    "pyyaml",
+]
+[project.urls]
+Repository = "https://github.com/webrecorder/warcit"
+Issues = "https://github.com/webrecorder/warcit/issues"
+
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
