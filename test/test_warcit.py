@@ -233,7 +233,7 @@ transclusions:
         assert os.path.isfile(self.conversion_results)
 
         with open(self.conversion_results) as fh:
-            results = yaml.load(fh.read())
+            results = yaml.safe_load(fh.read())
 
         assert len(results['conversions']['http://www.example.com/videos/barsandtone.flv']) == 4
         assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][0]['url'] == 'http://www.example.com/videos/barsandtone.flv.png'
