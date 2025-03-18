@@ -1,6 +1,6 @@
 [project]
 name = "warcit"
-version = "0.4.0"
+version = "0.4.1"
 description = "Convert directories, files, and ZIP files to WARC web archives"
 readme = "README.rst"
 authors = [
@@ -11,7 +11,7 @@ keywords = [
     "warc",
     "webrecorder",
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "warcio>=1.6.1",
     "cchardet",

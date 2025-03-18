@@ -7,8 +7,8 @@ import logging
 
 # ============================================================================
 def get_version():
-    import pkg_resources
-    return '%(prog)s ' + pkg_resources.get_distribution('warcit').version
+    from importlib.metadata import version
+    return '%(prog)s ' + version('warcit')
 
 
 # ============================================================================
