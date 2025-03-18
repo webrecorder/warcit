@@ -1,7 +1,7 @@
 [project]
 name = "warcit"
 version = "0.4.0"
-description = "Create WARC files from a directory"
+description = "Convert directories, files, and ZIP files to WARC web archives"
 readme = "README.rst"
 authors = [
     { name = "Ilya Kreymer" }
