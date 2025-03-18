@@ -14,9 +14,8 @@ keywords = [
 requires-python = ">=3.10"
 dependencies = [
     "warcio>=1.6.1",
-    "cchardet",
+    "faust-cchardet",
     "pyyaml",
-    "cython;python_version>='3.10'"
 ]
 classifiers=[
     'Development Status :: 4 - Beta',
