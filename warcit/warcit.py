@@ -241,10 +241,11 @@ class WARCIT(BaseTool):
             self.use_mapfile = True
             self.mapfile = mapfile
 
-        self.logfile = str(logfile + '.csv')
+        self.logfile = logfile
         self.use_logfile = False
         if self.logfile:
             self.use_logfile = True
+            self.logfile = f'{self.logfile}.csv'
 
         if conversions:
             self.conversion_serializer = ConversionSerializer(conversions)
