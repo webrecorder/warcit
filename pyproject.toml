@@ -15,7 +15,7 @@ requires-python = ">=3.10"
 dependencies = [
     "warcio>=1.6.1",
     "faust-cchardet",
-    "pyyaml<=6.0.2",
+    "pyyaml",
 ]
 classifiers=[
     'Development Status :: 4 - Beta',

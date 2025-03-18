@@ -307,7 +307,7 @@ requires-dist = [
     { name = "faust-cchardet" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-cov", marker = "extra == 'test'" },
-    { name = "pyyaml", specifier = "<=6.0.2" },
+    { name = "pyyaml" },
     { name = "warcio", specifier = ">=1.6.1" },
 ]
 provides-extras = ["test"]
