@@ -6,23 +6,53 @@ readme = "README.rst"
 authors = [
     { name = "Ilya Kreymer" }
 ]
-license = "Apache-2.0"
-license-files = ["LICENSE"]
+license = { text = "Apache-2.0" }
 keywords = [
     "warc",
     "webrecorder",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "warcio>=1.6.1",
     "cchardet",
     "pyyaml",
+    "cython;python_version>='3.10'"
 ]
+classifiers=[
+    'Development Status :: 4 - Beta',
+    'Environment :: Web Environment',
+    'License :: OSI Approved :: Apache Software License',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.4',
+    'Programming Language :: Python :: 3.5',
+    'Programming Language :: Python :: 3.6',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+    'Topic :: Utilities',
+]
+
 [project.urls]
 Repository = "https://github.com/webrecorder/warcit"
 Issues = "https://github.com/webrecorder/warcit/issues"
 
+[project.scripts]
+warcit = "warcit.warcit:main"
+warcit-converter = "warcit.converter:main"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+
+[tool.setuptools]
+zip-safe = true
+packages = ["warcit"]
+package-data = {"warcit" = ["*.yaml"]}
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules --cov warcit -v"
+testpaths = ["test", "warcit"]
