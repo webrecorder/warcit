@@ -6,7 +6,7 @@ readme = "README.rst"
 authors = [
     { name = "Ilya Kreymer" }
 ]
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
 keywords = [
     "warc",
     "webrecorder",
@@ -20,11 +20,11 @@ dependencies = [
 classifiers=[
     'Development Status :: 4 - Beta',
     'Environment :: Web Environment',
-    'License :: OSI Approved :: Apache Software License',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.4',
-    'Programming Language :: Python :: 3.5',
-    'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
     'Topic :: Software Development :: Libraries :: Python Modules',
     'Topic :: Utilities',
 ]
@@ -44,7 +44,6 @@ test = [
 ]
 
 [tool.setuptools]
-zip-safe = true
 packages = ["warcit"]
 package-data = {"warcit" = ["*.yaml"]}
 
