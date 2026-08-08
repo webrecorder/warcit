@@ -13,7 +13,7 @@ keywords = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "warcio>=1.6.1",
+    "warcio>=1.8.1",
     "faust-cchardet~=3.1",
     "pyyaml~=6.0",
 ]

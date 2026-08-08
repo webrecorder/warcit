@@ -444,6 +444,6 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "pyyaml", specifier = "~=6.0" },
-    { name = "warcio", specifier = ">=1.6.1" },
+    { name = "warcio", specifier = ">=1.8.1" },
 ]
 provides-extras = ["test"]
