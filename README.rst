@@ -12,9 +12,13 @@ WARCIT supports converting individual files, directories (including any nested d
 Install
 -----------
 
-Use pip to install the command line utility as a Python package:
+Run the project from source with ``uv``:
 
-``pip install warcit``
+``uv sync && uv run warcit --help``
+
+Or install an editable version as a command-line tool to make it available system-wide:
+
+``uv tool install -e .``
 
 
 Basic Usage
