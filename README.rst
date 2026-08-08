@@ -12,13 +12,25 @@ WARCIT supports converting individual files, directories (including any nested d
 Install
 -----------
 
-Run the project from source with ``uv``:
+Install the published release from PyPI:
+
+``uv tool install warcit``
+
+Or download the repo and run the project from source with ``uv``:
 
 ``uv sync && uv run warcit --help``
 
 Or install an editable version as a command-line tool to make it available system-wide:
 
 ``uv tool install -e .``
+
+
+Testing
+-------
+
+Run the test suite from the project root with ``uv``:
+
+``uv sync --extra test && uv run pytest``
 
 
 Basic Usage
