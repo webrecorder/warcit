@@ -440,10 +440,10 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "faust-cchardet" },
+    { name = "faust-cchardet", specifier = "~=3.1" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-cov", marker = "extra == 'test'" },
-    { name = "pyyaml" },
+    { name = "pyyaml", specifier = "~=6.0" },
     { name = "warcio", specifier = ">=1.6.1" },
 ]
 provides-extras = ["test"]
