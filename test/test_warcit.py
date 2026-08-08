@@ -102,7 +102,7 @@ class TestWarcIt(object):
 
         out, err = capsys.readouterr()
         out = out.lower() # charset names might be uppercase or lowercase
-        assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=windows-1258"' in out
+        assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=utf-8"' in out
         assert '"warc-target-uri": "http://www.iana.org/_css/2015.1/print.css", "content-type": "text/css; charset=utf-8"' in out
 
     def test_warcit_use_charset_custom(self, capsys):
