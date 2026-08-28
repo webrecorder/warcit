@@ -30,7 +30,7 @@ Testing
 
 Run the test suite from the project root with ``uv``:
 
-``uv sync --extra test && uv run pytest``
+``uv sync --dev && uv run pytest``
 
 
 Basic Usage

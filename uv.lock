@@ -432,8 +432,8 @@ dependencies = [
     { name = "warcio" },
 ]
 
-[package.optional-dependencies]
-test = [
+[package.dev-dependencies]
+dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
@@ -441,9 +441,12 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "faust-cchardet", specifier = "~=3.1" },
-    { name = "pytest", marker = "extra == 'test'" },
-    { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "pyyaml", specifier = "~=6.0" },
     { name = "warcio", specifier = ">=1.8.1" },
 ]
-provides-extras = ["test"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+]

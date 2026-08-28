@@ -37,8 +37,8 @@ Issues = "https://github.com/webrecorder/warcit/issues"
 warcit = "warcit.warcit:main"
 warcit-converter = "warcit.converter:main"
 
-[project.optional-dependencies]
-test = [
+[dependency-groups]
+dev = [
     "pytest",
     "pytest-cov",
 ]
