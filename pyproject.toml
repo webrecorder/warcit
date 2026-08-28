@@ -1,0 +1,56 @@
+[project]
+name = "warcit"
+version = "0.4.1"
+description = "Convert directories, files, and ZIP files to WARC web archives"
+readme = "README.rst"
+authors = [
+    { name = "Ilya Kreymer" }
+]
+license = "Apache-2.0"
+keywords = [
+    "warc",
+    "webrecorder",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "warcio>=1.8.1",
+    "faust-cchardet~=3.1",
+    "pyyaml~=6.0",
+]
+classifiers=[
+    'Development Status :: 4 - Beta',
+    'Environment :: Web Environment',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+    'Topic :: Utilities',
+]
+
+[project.urls]
+Repository = "https://github.com/webrecorder/warcit"
+Issues = "https://github.com/webrecorder/warcit/issues"
+
+[project.scripts]
+warcit = "warcit.warcit:main"
+warcit-converter = "warcit.converter:main"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+
+[tool.setuptools]
+packages = ["warcit"]
+package-data = {"warcit" = ["*.yaml"]}
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules --cov warcit -v"
+testpaths = ["test", "warcit"]

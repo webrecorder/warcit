@@ -3,7 +3,7 @@ WARCIT
 
 ``warcit`` is a command-line tool to convert on-disk directories of web documents (commonly HTML, web assets and any other data files) into an ISO standard web archive (WARC) files.
 
-Conversion to WARC file allows for improved durability in a standardized format, and allows for any web files stored on disk to be uploaded into  `Webrecorder <https://github.com/webrecorder/webrecorder>`_, or replayed locally with `Webrecorder Player <https://github.com/webrecorder/webrecorderplayer-electron/releases>`_ or  `pywb <https://github.com/ikreymer/pywb>`_
+Conversion to WARC file allows for improved durability in a standardized format, and allows any website files stored on disk to be replayed locally through `ReplayWeb.page <https://webrecorder.net/replaywebpage/>`_ or  `pywb <https://github.com/webrecorder/pywb>`_
 
 (Many other tools also operate on WARC files, see: `Awesome Web Archiving -- Tools and Software <https://github.com/iipc/awesome-web-archiving#tools--software>`_)
 
@@ -12,9 +12,25 @@ WARCIT supports converting individual files, directories (including any nested d
 Install
 -----------
 
-Use pip to install the command line utility as a Python package:
+Install the published release from PyPI:
 
-``pip install warcit``
+``uv tool install warcit``
+
+Or download the repo and run the project from source with ``uv``:
+
+``uv sync && uv run warcit --help``
+
+Or install an editable version as a command-line tool to make it available system-wide:
+
+``uv tool install -e .``
+
+
+Testing
+-------
+
+Run the test suite from the project root with ``uv``:
+
+``uv sync --extra test && uv run pytest``
 
 
 Basic Usage

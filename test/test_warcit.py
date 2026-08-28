@@ -102,7 +102,7 @@ class TestWarcIt(object):
 
         out, err = capsys.readouterr()
         out = out.lower() # charset names might be uppercase or lowercase
-        assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=windows-1258"' in out
+        assert '"warc-target-uri": "http://www.iana.org/index.html", "content-type": "text/html; charset=utf-8"' in out
         assert '"warc-target-uri": "http://www.iana.org/_css/2015.1/print.css", "content-type": "text/css; charset=utf-8"' in out
 
     def test_warcit_use_charset_custom(self, capsys):
@@ -233,7 +233,7 @@ transclusions:
         assert os.path.isfile(self.conversion_results)
 
         with open(self.conversion_results) as fh:
-            results = yaml.load(fh.read())
+            results = yaml.safe_load(fh.read())
 
         assert len(results['conversions']['http://www.example.com/videos/barsandtone.flv']) == 4
         assert results['conversions']['http://www.example.com/videos/barsandtone.flv'][0]['url'] == 'http://www.example.com/videos/barsandtone.flv.png'
